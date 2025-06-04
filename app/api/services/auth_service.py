@@ -4,8 +4,8 @@ Service d'authentification
 from datetime import timedelta
 from typing import Optional
 from fastapi import HTTPException, status
-from repositories.user_repository import UserRepository
-from models.user import UserCreate, UserInDB, Token
+from api.repositories.user_repository import UserRepository
+from api.models.user import UserCreate, UserInDB, Token
 from core.security import create_access_token
 from core.config import settings
 

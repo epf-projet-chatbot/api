@@ -16,7 +16,7 @@ down:
 
 # Démarrer et tester l'API
 test: up
-	@echo "⏳ Attente du démarrage des services..."
+	@echo "Attente du démarrage des services..."
 	@sleep 10
 	@echo "Lancement des tests..."
 	python test_api.py

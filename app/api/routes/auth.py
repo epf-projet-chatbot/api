@@ -3,9 +3,9 @@ Routes d'authentification
 """
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
-from models.user import UserCreate, UserResponse, Token
-from services.auth_service import AuthService
-from repositories.user_repository import UserRepository
+from api.models.user import UserCreate, UserResponse, Token
+from api.services.auth_service import AuthService
+from api.repositories.user_repository import UserRepository
 from core.database import get_database
 from core.security import get_current_active_user
 
