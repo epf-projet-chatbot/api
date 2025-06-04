@@ -9,6 +9,7 @@ from core.config import settings
 from core.database import db_manager, get_database
 from core.security import get_current_active_user
 from routes import auth_router
+from routes import message_router
 
 
 @asynccontextmanager
@@ -74,7 +75,7 @@ app.add_middleware(
 
 # Inclusion des routes
 app.include_router(auth_router)
-
+app.include_router(message_router)
 
 # Routes de base
 @app.get("/", tags=["Root"])
@@ -123,6 +124,7 @@ async def protected_route(current_user: dict = Depends(get_current_active_user))
             "role": current_user.get("role", "user")
         }
     }
+
 
 
 # Point d'entrée pour le développement
