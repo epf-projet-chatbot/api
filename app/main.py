@@ -8,8 +8,8 @@ from contextlib import asynccontextmanager
 from core.config import settings
 from core.database import db_manager, get_database
 from core.security import get_current_active_user
-from routes import auth_router
-from routes import message_router
+#from api.routes import auth_router
+from api.routes import message_router
 
 
 @asynccontextmanager
@@ -74,7 +74,7 @@ app.add_middleware(
 )
 
 # Inclusion des routes
-app.include_router(auth_router)
+#app.include_router(auth_router)
 app.include_router(message_router)
 
 # Routes de base
