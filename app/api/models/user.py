@@ -56,11 +56,15 @@ class UserInDB(UserBase):
     id: PyObjectId = Field(default_factory=PyObjectId, alias="_id")
     hashed_password: str
     created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: Optional[datetime] = None
 
     model_config = {
         "populate_by_name": True,
         "arbitrary_types_allowed": True,
-        "json_encoders": {ObjectId: str}
+        "json_encoders": {
+            ObjectId: str,
+            datetime: lambda v: v.isoformat()
+        }
     }
 
 
@@ -68,10 +72,15 @@ class UserResponse(UserBase):
     """Schéma de réponse pour un utilisateur"""
     id: str = Field(alias="_id")
     created_at: datetime
+    updated_at: Optional[datetime] = None
 
     model_config = {
         "populate_by_name": True,
-        "from_attributes": True
+        "from_attributes": True,
+        "json_encoders": {
+            datetime: lambda v: v.isoformat(),
+            ObjectId: str
+        }
     }
 
 
