@@ -1,0 +1,24 @@
+fastapi==0.115.12
+uvicorn[standard]==0.34.3
+
+# Authentification JWT
+python-jose[cryptography]==3.3.0
+python-multipart==0.0.20
+passlib[bcrypt]==1.7.4
+
+# MongoDB async
+motor==3.7.1
+pymongo==4.13.0
+beanie==1.27.0
+
+# Variables d'environnement
+python-dotenv==1.1.0
+
+# Validation des schémas
+pydantic==2.11.5
+pydantic-settings==2.1.0
+email-validator==2.2.0
+
+# CORS
+fastapi-cors==0.0.6
+

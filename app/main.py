@@ -9,6 +9,7 @@ from contextlib import asynccontextmanager
 from core.config import settings
 from core.database import db_manager, get_database
 from core.security import get_current_active_user
+
 from api.routes import auth_router
 from api.routes.chat_router import router as chat_router
 
@@ -78,10 +79,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Inclusion des routes
+
 app.include_router(auth_router)
 app.include_router(chat_router)
-
 
 # Routes de base
 @app.get("/", tags=["Root"])
@@ -133,6 +133,7 @@ async def protected_route(current_user: dict = Depends(get_current_active_user))
             "role": current_user.get("role", "user")
         }
     }
+
 
 
 # Point d'entrée pour le développement
