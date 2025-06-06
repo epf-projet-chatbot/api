@@ -10,8 +10,7 @@ from core.config import settings
 from core.database import db_manager, get_database
 from core.security import get_current_active_user
 
-from api.routes import auth_router
-from api.routes.chat_router import router as chat_router
+from api.routes import auth_router, chat_router, message_router
 
 # Configuration du logging
 logging.basicConfig(level=logging.INFO)
@@ -82,6 +81,7 @@ app.add_middleware(
 
 app.include_router(auth_router)
 app.include_router(chat_router)
+app.include_router(message_router)
 
 # Routes de base
 @app.get("/", tags=["Root"])
