@@ -21,3 +21,4 @@ email-validator==2.2.0
 
 # CORS
 fastapi-cors==0.0.6
+

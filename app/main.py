@@ -1,6 +1,7 @@
 """
 Application FastAPI principale pour le Chatbot API
 """
+import logging
 from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
@@ -8,8 +9,13 @@ from contextlib import asynccontextmanager
 from core.config import settings
 from core.database import db_manager, get_database
 from core.security import get_current_active_user
-#from api.routes import auth_router
-from api.routes import message_router
+
+from api.routes import auth_router
+from api.routes.chat_router import router as chat_router
+
+# Configuration du logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
@@ -73,9 +79,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Inclusion des routes
-#app.include_router(auth_router)
-app.include_router(message_router)
+
+app.include_router(auth_router)
+app.include_router(chat_router)
 
 # Routes de base
 @app.get("/", tags=["Root"])
@@ -91,6 +97,7 @@ async def read_root():
 @app.get("/health", tags=["Health"])
 async def health_check():
     """Vérification de santé de l'API et de MongoDB"""
+    logger.info("🏥 HEALTH CHECK: Endpoint called!")
     try:
         # Test de connexion MongoDB simple et efficace
         if db_manager.database is None:
@@ -98,6 +105,7 @@ async def health_check():
         
         # Test simple avec list_collection_names() qui fonctionne toujours
         collections = await db_manager.database.list_collection_names()
+        logger.info(f"🏥 HEALTH CHECK: Found {len(collections)} collections")
         
         return {
             "status": "healthy", 
@@ -107,6 +115,7 @@ async def health_check():
             "collections_count": len(collections)
         }
     except Exception as e:
+        logger.error(f"🏥 HEALTH CHECK ERROR: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail=f"Database connection failed: {str(e)}"

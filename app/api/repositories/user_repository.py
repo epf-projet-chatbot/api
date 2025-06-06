@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import Optional, List
 from bson import ObjectId
 from motor.motor_asyncio import AsyncIOMotorDatabase
-from models.user import UserCreate, UserUpdate, UserInDB
+from api.models.user import UserCreate, UserUpdate, UserInDB
 from core.security import get_password_hash, verify_password
 
 
@@ -62,6 +62,7 @@ class UserRepository:
             update_data["role"] = user_data.role
             
         if update_data:
+            update_data["updated_at"] = datetime.utcnow()
             result = await self.collection.update_one(
                 {"_id": ObjectId(user_id)},
                 {"$set": update_data}
