@@ -6,6 +6,8 @@ services:
     environment:
       - MONGODB_URL=mongodb://mongo:27017
       - DATABASE_NAME=chatbot_db
+    volumes:
+      - ./app:/app  # Mount le code source pour hot reload
     depends_on:
       mongo:
         condition: service_healthy

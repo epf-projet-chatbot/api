@@ -10,7 +10,6 @@ class Attachment(BaseModel):
 
 class Message(Document):
     id: Optional[PydanticObjectId] = Field(None, alias="_id")
-    user_id: PydanticObjectId = Field(...)
     discussion_id: PydanticObjectId = Field(...)
     content: str = Field(...)
     date_created: datetime = Field(default_factory=datetime.utcnow)
@@ -20,7 +19,6 @@ class Message(Document):
         json_schema_extra = {
             "example": {
                 "id": "60d5ec49f8d2e4b8b4e7b8c0",
-                "user_id": "60d5ec49f8d2e4b8b4e7b8c1",
                 "discussion_id": "60d5ec49f8d2e4b8b4e7b8c2",
                 "content": "Bonjour, comment ça va ?",
                 "date_created": "2023-10-01T12:00:00Z",
