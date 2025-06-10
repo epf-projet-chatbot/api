@@ -1,3 +1,4 @@
+from bson import ObjectId
 from api.schemas.chat_schema import ChatCreate, ChatUpdate
 from typing import List, Optional, Dict, Any
 from motor.motor_asyncio import AsyncIOMotorDatabase
@@ -39,8 +40,8 @@ class ChatController:
             print("🔍 ERROR: Could not retrieve inserted document")
             return chat_dict
 
-    async def get_all_chats(self) -> List[Dict[str, Any]]:
-        cursor = self.collection.find()
+    async def get_all_chats(self,user:str) -> List[Dict[str, Any]]:
+        cursor = self.collection.find({"user_id": user})
         chats = []
         async for chat_doc in cursor:
             chat_doc["id"] = str(chat_doc["_id"])

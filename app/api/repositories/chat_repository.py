@@ -5,7 +5,7 @@ Repository pour la gestion des discussions en MongoDB
 from datetime import datetime
 from typing import Optional, List
 from bson import ObjectId
-from api.models.chat import Chat
+from api.models.chat_model import Chat
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
 class ChatRepository:

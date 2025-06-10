@@ -4,7 +4,7 @@ from bson import ObjectId
 from bson.errors import InvalidId
 
 from ..controllers.message_controllers import get_all_messages_by_chat, get_message, create_message, delete_message
-from ..schemas.message_schemas import MessageSchema
+from ..schemas.message_schemas import MessageCreate
 
 router = APIRouter(
     prefix="/messages",
@@ -37,7 +37,7 @@ async def fetch_message(message_id: str):
         raise HTTPException(status_code=400, detail=str(e))
     
 @router.post("/", response_model=None)
-async def create_messages(message: MessageSchema):
+async def create_messages(message: MessageCreate):
     try:
         message_id = await create_message(
             discussion=ObjectId(message.discussion_id),
