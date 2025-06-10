@@ -6,10 +6,11 @@ from datetime import datetime
 from typing import List
 
 
-async def get_all_messages():
+async def get_all_messages_by_chat(discussion:str):
     db = get_database()
     try:
-        cursor = db.messages.find()
+        discussion_id = ObjectId(discussion)
+        cursor = db.messages.find({"discussion_id": discussion_id})
         messages= []
         async for msg in cursor:
             msg["_id"] = str(msg["_id"])
@@ -17,6 +18,8 @@ async def get_all_messages():
                 msg["discussion_id"] = str(msg["discussion_id"])
             messages.append(msg)
         return messages
+    except InvalidId:
+        raise ValueError(f"Invalid ObjectId format for discussion_id: {discussion}")
     except Exception as e:
         raise ValueError(f"Error fetching messages: {str(e)}")
 
@@ -59,6 +62,8 @@ async def create_message(discussion: str, content: str, attachments: List[dict] 
                         attachment['url'] = str(attachment['url'])
                     attachment_dicts.append(attachment)
             message_data["attachments"] = attachment_dicts
+        else:
+            message_data["attachments"] = []
         
         cursor = await db.messages.insert_one(message_data)
         return str(cursor.inserted_id)

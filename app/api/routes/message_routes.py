@@ -1,22 +1,28 @@
 from fastapi import APIRouter, HTTPException
 from typing import List
 from bson import ObjectId
+from bson.errors import InvalidId
 
-from ..controllers.message_controllers import get_all_messages, get_message, create_message, delete_message
-from ..schemas.message_schemas import MessageSchema
+from ..controllers.message_controllers import get_all_messages_by_chat, get_message, create_message, delete_message
+from ..schemas.message_schemas import MessageCreate
 
 router = APIRouter(
     prefix="/messages",
     tags=["Messages"]
 )
 
-@router.get("/", response_model=None)
-async def fetch_all_messages():
+@router.get("/{discussion_id}", response_model=None)
+async def fetch_all_messages_by_chat(discussion:str):
     try:
-        messages = await get_all_messages()
+        if not discussion:
+            raise HTTPException(status_code=400, detail="L'ID de la discussion est requis") 
+        discussion_id = ObjectId(discussion)
+        messages = await get_all_messages_by_chat(discussion_id)
         if not messages:
             raise HTTPException(status_code=404, detail="Aucun message trouvé")
         return messages
+    except InvalidId:
+        raise HTTPException(status_code=400, detail="Format d'ID de discussion invalide")
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -31,7 +37,7 @@ async def fetch_message(message_id: str):
         raise HTTPException(status_code=400, detail=str(e))
     
 @router.post("/", response_model=None)
-async def create_messages(message: MessageSchema):
+async def create_messages(message: MessageCreate):
     try:
         message_id = await create_message(
             discussion=ObjectId(message.discussion_id),
@@ -42,7 +48,7 @@ async def create_messages(message: MessageSchema):
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Erreuuur lors de la création du message: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Erreur lors de la création du message: {str(e)}")
 
 @router.delete("/{message_id}", response_model=None)
 async def delete_messages(message: str):

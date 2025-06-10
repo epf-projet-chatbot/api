@@ -1,3 +1,4 @@
+from bson import ObjectId
 from fastapi import APIRouter, HTTPException, Depends
 from typing import List
 
@@ -23,9 +24,9 @@ async def create_chat(data: ChatCreate, controller: ChatController = Depends(get
     return result
 
 @router.get("/", response_model=List[ChatSchema])
-async def list_chats(controller: ChatController = Depends(get_chat_controller)):
+async def list_chats(user_id:str, controller: ChatController = Depends(get_chat_controller)):
     """Lister toutes les discussions."""
-    return await controller.get_all_chats()
+    return await controller.get_all_chats(user_id)
 
 @router.get("/debug-test")
 async def test_debug():
