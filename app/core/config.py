@@ -24,7 +24,20 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int = 30
     
     # Configuration CORS
-    cors_origins: list[str] = ["*"]
+    cors_origins: list[str] = ["http://localhost:3000"]
+    
+    # Configuration de l'environnement
+    environment: str = "development"  # "development" ou "production"
+    
+    @property
+    def is_production(self) -> bool:
+        """Vérifie si on est en production"""
+        return self.environment.lower() == "production"
+    
+    @property
+    def cookie_secure(self) -> bool:
+        """Détermine si les cookies doivent être sécurisés"""
+        return self.is_production
     
     class Config:
         env_file = ".env"

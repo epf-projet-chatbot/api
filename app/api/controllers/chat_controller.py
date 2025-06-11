@@ -29,8 +29,8 @@ class ChatController:
         else:
             return chat_dict
 
-    async def get_all_chats(self,user:str) -> List[Dict[str, Any]]:
-        cursor = self.collection.find({"user_id": user})
+    async def get_all_chats(self, user_id: str) -> List[Dict[str, Any]]:
+        cursor = self.collection.find({"user_id": user_id})
         chats = []
         async for chat_doc in cursor:
             chat_doc["id"] = str(chat_doc["_id"])
