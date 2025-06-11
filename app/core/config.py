@@ -16,7 +16,7 @@ class Settings(BaseSettings):
     
     # Configuration MongoDB
     mongodb_url: str = "mongodb://localhost:27017"
-    database_name: str = "chatbot"
+    database_name: str = "chatbot_db"
     
     # Configuration JWT
     secret_key: str = "your-secret-key-here-change-in-production"

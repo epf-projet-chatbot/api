@@ -42,7 +42,7 @@ def test_api_endpoints():
         print("Endpoint root OK")
         
         # Test registration
-        print("\n🧪 Test registration...")
+        print("\nTest registration...")
         user_data = {
             "email": "test@example.com",
             "password": "testpassword123",
