@@ -25,10 +25,12 @@ async def create_chat(
     current_user: dict = Depends(get_current_active_user)
 ):
     """Créer une nouvelle discussion."""
+    print(f"🚀 ROUTE DEBUG: create_chat called with data: {data}")
+    print(f"🚀 ROUTE DEBUG: current_user: {current_user['email']}")
+    print(f"🚀 ROUTE DEBUG: controller type: {type(controller)}")
     
     # Ajouter l'user_id depuis l'utilisateur connecté
     data.user_id = current_user["_id"]
-
     result = await controller.create_chat(data)
     return result
 
@@ -68,29 +70,16 @@ async def delete_chat(
     controller: ChatController = Depends(get_chat_controller),
     current_user: dict = Depends(get_current_active_user)
 ):
-    """
-    Supprimer une discussion et tous ses documents associés (suppression en cascade)
-    - Supprime tous les messages du chat
-    - Supprime tous les fichiers/attachments associés (GridFS + filesystem)
-    - Supprime le chat lui-même
-    """
-    try:
-        # Utiliser la nouvelle méthode de suppression en cascade
-        success = await controller.delete_chat(chat_id, current_user["_id"])
-        
-        if not success:
-            raise HTTPException(
-                status_code=404, 
-                detail="Chat not found or access denied"
-            )
-        
-        return {
-            "detail": "Chat and all associated data deleted successfully",
-            "chat_id": chat_id
-        }
-        
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Error during cascade deletion: {str(e)}"
-        )
+    """Supprimer une discussion par son ID (seulement si elle appartient à l'utilisateur)."""
+    # Vérifier d'abord que le chat existe et appartient à l'utilisateur
+    chat = await controller.get_chat_by_id(chat_id)
+    if not chat:
+        raise HTTPException(status_code=404, detail="Chat not found")
+    
+    if chat.get("user_id") != current_user["_id"]:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    success = await controller.delete_chat(chat_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Chat not found")
+    return {"detail": "Deleted successfully"}
