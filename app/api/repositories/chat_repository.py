@@ -22,13 +22,17 @@ class ChatRepository:
         """Créer une nouvelle discussion"""
         chat_data["created_at"] = datetime.utcnow()
         result = await self.collection.insert_one(chat_data)
-        chat_data["_id"] = result.inserted_id
+        
+        # Uniformiser : toujours retourner l'ID en string
+        chat_data["_id"] = str(result.inserted_id)
         return chat_data
     
     async def get_chat_by_id(self, chat_id: str) -> Optional[dict]:
         """Récupérer une discussion par son ID"""
         chat_doc = await self.collection.find_one({"_id": ObjectId(chat_id)})
         if chat_doc:
+            # Uniformiser : convertir l'ObjectId en string
+            chat_doc["_id"] = str(chat_doc["_id"])
             return chat_doc
         return None
     
@@ -36,6 +40,8 @@ class ChatRepository:
         """Récupérer toutes les discussions d'un utilisateur"""
         chats = []
         async for chat in self.collection.find({"user_id": ObjectId(user_id)}):
+            # Uniformiser : convertir l'ObjectId en string
+            chat["_id"] = str(chat["_id"])
             chats.append(chat)
         return chats
     
@@ -47,7 +53,8 @@ class ChatRepository:
             {"$set": update_data}
         )
         if result.modified_count > 0:
-            return await self.get_chat_by_id(chat_id)
+            updated_chat = await self.get_chat_by_id(chat_id)
+            return updated_chat  # get_chat_by_id retourne déjà l'ID en string
         return None
     
     async def delete_chat(self, chat_id: str) -> bool:

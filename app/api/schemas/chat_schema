@@ -23,7 +23,7 @@ class Chat(BaseModel):
     user_id: str
     created_at: datetime  # Date de création de la session de chat
     updated_at: datetime  # Date de dernière mise à jour de la session de chat
-    topic: str  # Sujet du chat, par exemple "droit du travail", "droit fiscal", etc.
+    topic: Optional[str] = None  # Sujet du chat, par exemple "droit du travail", "droit fiscal", etc.
 
     model_config = {
         "json_encoders": {

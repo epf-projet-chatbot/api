@@ -12,21 +12,19 @@ router = APIRouter(
 )
 
 @router.get("/{discussion_id}", response_model=None)
-async def fetch_all_messages_by_chat(discussion:str):
+async def fetch_all_messages_by_chat(discussion_id: str):
     try:
-        if not discussion:
+        if not discussion_id:
             raise HTTPException(status_code=400, detail="L'ID de la discussion est requis") 
-        discussion_id = ObjectId(discussion)
         messages = await get_all_messages_by_chat(discussion_id)
-        if not messages:
-            raise HTTPException(status_code=404, detail="Aucun message trouvé")
-        return messages
+        # Retourner une liste vide au lieu d'une erreur si aucun message
+        return messages if messages else []
     except InvalidId:
         raise HTTPException(status_code=400, detail="Format d'ID de discussion invalide")
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-@router.get("/{message_id}", response_model=None)
+@router.get("/single/{message_id}", response_model=None)
 async def fetch_message(message_id: str):
     try:
         message = await get_message(message_id)
@@ -42,7 +40,8 @@ async def create_messages(message: MessageCreate):
         message_id = await create_message(
             discussion=ObjectId(message.discussion_id),
             content=message.content,
-            attachments=message.attachments
+            role=message.role,  
+            attachments=message.attachments  
         )
         return {"message_id": message_id}
     except ValueError as e:

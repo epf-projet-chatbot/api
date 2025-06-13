@@ -33,6 +33,7 @@ class MessageSchema(BaseModel):
 class MessageCreate(BaseModel):
     discussion_id: PydanticObjectId = Field(..., description="ID de la discussion")
     content: str = Field(..., description="Contenu du message")
+    role: Optional[str] = Field("user", description="Rôle de l'expéditeur du message (par exemple, 'user', 'bot')")
     attachments: Optional[List[Attachment]] = Field(None, description="Liste des pièces jointes")
 
 class MessageUpdate(BaseModel):
