@@ -37,13 +37,14 @@ async def get_message(message: str):
     else:
         raise ValueError(f"Message with id {message_id} not found")
 
-async def create_message(discussion: str, content: str, attachments: List[dict] = None):
+async def create_message(discussion: str, content: str, role: str = "user", attachments: List[dict] = None):
     db = get_database()
     try:
         discussion_id = ObjectId(discussion)
         message_data = {
             "discussion_id": discussion_id,
             "content": content,
+            "role": role,
             "date_created": datetime.now()
         }
         if attachments:

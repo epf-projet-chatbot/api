@@ -23,10 +23,9 @@ class Chat(BaseModel):
     """
     id: str
     user_id: str
-    messages: List[Dict[str, Any]]  # Liste des messages échangés dans la session de chat
     created_at: datetime  # Date de création de la session de chat
     updated_at: datetime  # Date de dernière mise à jour de la session de chat
-    topic: str  # Sujet du chat, par exemple "droit du travail", "droit fiscal", etc.
+    topic: Optional[str] = None  # Sujet du chat, par exemple "droit du travail", "droit fiscal", etc.
 
     model_config = {
         "json_encoders": {
