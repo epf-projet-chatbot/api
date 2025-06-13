@@ -16,9 +16,7 @@ router = APIRouter(prefix="/upload", tags=["Upload"])
 
 def get_upload_controller(db=Depends(get_database)) -> UploadController:
     """Dépendance pour obtenir le contrôleur d'upload"""
-    print(f"🔧 DEPENDENCY: get_upload_controller called with db: {db}")
     controller = UploadController(db)
-    print(f"🔧 DEPENDENCY: created upload controller: {controller}")
     return controller
 
 
@@ -60,11 +58,7 @@ async def download_gridfs_file(
     """
     try:
         from fastapi import Response
-        
-        # Récupérer le contenu et les métadonnées
         content, metadata = await upload_controller.get_gridfs_file_content(file_id)
-        
-        # Retourner le fichier avec les bons headers
         return Response(
             content=content,
             media_type=metadata["content_type"],
@@ -73,7 +67,6 @@ async def download_gridfs_file(
                 "Content-Length": str(metadata["file_size"])
             }
         )
-        
     except HTTPException:
         raise
     except Exception as e:
@@ -127,7 +120,6 @@ async def debug_gridfs_file(
     try:
         from bson import ObjectId
         
-        # Utiliser la collection files.files pour récupérer les métadonnées
         files_collection = upload_controller.database.get_collection("files.files")
         grid_file = await files_collection.find_one({"_id": ObjectId(file_id)})
         
@@ -136,8 +128,6 @@ async def debug_gridfs_file(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Fichier GridFS non trouvé"
             )
-        
-        # Récupérer les métadonnées complètes
         debug_info = {
             "file_id": str(grid_file["_id"]),
             "filename": grid_file.get("filename"),
@@ -147,8 +137,6 @@ async def debug_gridfs_file(
             "current_user_id": current_user["_id"],
             "current_user_id_type": type(current_user["_id"]).__name__
         }
-        
-        # Vérifier le user_id dans les métadonnées
         metadata = grid_file.get("metadata", {})
         if metadata:
             file_user_id = metadata.get("user_id")
