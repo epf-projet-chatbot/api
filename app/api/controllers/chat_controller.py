@@ -72,7 +72,12 @@ class ChatController:
         from bson import ObjectId
         
         try:
+            # Valider l'ObjectId
+            if not ObjectId.is_valid(chat_id):
+                return False
+                
             chat_object_id = ObjectId(chat_id)
+            
             # vérifier que le chat existe et appartient à l'utilisateur
             chat_doc = await self.collection.find_one({
                 "_id": chat_object_id,
@@ -83,23 +88,19 @@ class ChatController:
                 return False
             
             # supprimer tous les fichiers associés aux messages du chat
-            files_deleted = await self._delete_chat_files(chat_id)
-            
+            files_deleted = await self._delete_chat_files(chat_id)            
             # supprimer tous les messages associés au chat
-            messages_deleted = await self._delete_chat_messages(chat_id)
-            
+            messages_deleted = await self._delete_chat_messages(chat_id)            
             # supprimer le chat lui-même
             result = await self.collection.delete_one({"_id": chat_object_id})
             chat_deleted = result.deleted_count > 0
             
-            if chat_deleted:
-                print(f"✅ Chat {chat_id} and all associated data deleted successfully")
-            else:
-                print(f"❌ Failed to delete chat {chat_id}")
-            
             return chat_deleted
             
         except Exception as e:
+            print(f"❌ Error in delete_chat: {str(e)}")
+            import traceback
+            traceback.print_exc()
             return False
 
     async def _delete_chat_messages(self, chat_id: str) -> int:
