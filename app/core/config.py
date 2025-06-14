@@ -26,6 +26,8 @@ class Settings(BaseSettings):
     # Configuration CORS
     cors_origins: list[str] = ["http://localhost:3000"]
     
+    # Configuration des fichiers
+    base_url: str = "http://localhost:8000"  # URL de base de l'API
     # Configuration de l'environnement
     environment: str = "development"  # "development" ou "production"
     
