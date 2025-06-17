@@ -1,5 +1,6 @@
 fastapi==0.115.12
 uvicorn[standard]==0.34.3
+beanie==1.29.0
 
 # Authentification JWT
 python-jose[cryptography]==3.3.0
@@ -28,3 +29,6 @@ typing-inspection==0.4.1
 # Tests
 requests==2.32.3
 typing_extensions==4.13.2
+
+# Module RAG 
+-e ./rag

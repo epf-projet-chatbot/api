@@ -67,3 +67,6 @@ class MessageResponse(BaseModel):
                 }
             }
         }
+        
+class BotQuery(BaseModel):
+    query: str

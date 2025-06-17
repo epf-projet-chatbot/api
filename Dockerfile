@@ -4,7 +4,12 @@ WORKDIR /app
 
 COPY app/requirements.txt .
 
+# Copie le code RAG dans /app/rag
+COPY ../rag ./rag
+
 RUN pip install --no-cache-dir -r requirements.txt
+
+RUN pip install -e ./rag
 
 COPY app/ .
 

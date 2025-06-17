@@ -3,8 +3,9 @@ from typing import List
 from bson import ObjectId
 from bson.errors import InvalidId
 
+from chatbot_rag.answer import answer
 from ..controllers.message_controllers import get_all_messages_by_chat, get_message, create_message, delete_message
-from ..schemas.message_schemas import MessageCreate
+from ..schemas.message_schemas import MessageCreate, BotQuery
 
 router = APIRouter(
     prefix="/messages",
@@ -48,6 +49,33 @@ async def create_messages(message: MessageCreate):
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erreur lors de la création du message: {str(e)}")
+
+@router.post("/{discussion_id}/chatbot", response_model=None)
+async def create_bot_message(discussion_id: str, payload: BotQuery):
+    try:
+        query = payload.query
+        if not discussion_id or not query:
+            raise HTTPException(status_code=400, detail="L'ID de la discussion et le contenu sont requis")
+
+        
+        # Appel à la fonction answer pour générer la réponse du bot
+        response = answer(query)
+        
+        # Créer le message avec le rôle "bot"
+        message_id = await create_message(
+            discussion=ObjectId(discussion_id),
+            content=response,
+            role="bot"
+        )
+        
+        return {"message_id": message_id, "response": response}
+    except InvalidId:
+        raise HTTPException(status_code=400, detail="Format d'ID de discussion invalide")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erreur lors de la création du message du bot: {str(e)}")
+    
 
 @router.delete("/{message_id}", response_model=None)
 async def delete_messages(message: str):
