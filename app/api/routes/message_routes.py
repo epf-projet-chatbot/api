@@ -3,7 +3,7 @@ from typing import List
 from bson import ObjectId
 from bson.errors import InvalidId
 
-from chatbot_rag.answer import answer
+from rag.chatbot_rag.answer import answer
 from ..controllers.message_controllers import get_all_messages_by_chat, get_message, create_message, delete_message
 from ..schemas.message_schemas import MessageCreate, BotQuery
 
