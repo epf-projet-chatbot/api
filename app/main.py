@@ -79,10 +79,10 @@ app.add_middleware(
 )
 
 
-app.include_router(auth_router, prefix="/api")
-app.include_router(chat_router, prefix="/api")
-app.include_router(message_router, prefix="/api")
-app.include_router(upload_router, prefix="/api")
+app.include_router(auth_router)
+app.include_router(chat_router)
+app.include_router(message_router)
+app.include_router(upload_router)
 
 # Routes de base
 @app.get("/api/", tags=["Root"])
