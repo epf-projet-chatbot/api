@@ -24,7 +24,7 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int = 30
     
     # Configuration CORS
-    cors_origins: list[str] = ["http://localhost:3000"]
+    cors_origins: list[str] = ["https://badinter.epfprojets.com"]
     
     # Configuration des fichiers
     base_url: str = "http://localhost:8000"  # URL de base de l'API
