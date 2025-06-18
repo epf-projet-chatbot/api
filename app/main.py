@@ -10,7 +10,7 @@ from core.config import settings
 from core.database import db_manager, get_database
 from core.security import get_current_active_user
 
-from api.routes import auth_router, chat_router, message_router
+from api.routes import auth_router, chat_router, message_router, upload_router
 
 # Configuration du logging
 logging.basicConfig(level=logging.INFO)
@@ -72,7 +72,7 @@ app = FastAPI(
 # Configuration CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.cors_origins,
+    allow_origins=settings.cors_origins_list,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -82,9 +82,10 @@ app.add_middleware(
 app.include_router(auth_router)
 app.include_router(chat_router)
 app.include_router(message_router)
+app.include_router(upload_router)
 
 # Routes de base
-@app.get("/", tags=["Root"])
+@app.get("/api/", tags=["Root"])
 async def read_root():
     """Route de base pour vérifier que l'API fonctionne"""
     return {
@@ -94,7 +95,7 @@ async def read_root():
     }
 
 
-@app.get("/health", tags=["Health"])
+@app.get("/api/health", tags=["Health"])
 async def health_check():
     """Vérification de santé de l'API et de MongoDB"""
     logger.info("🏥 HEALTH CHECK: Endpoint called!")

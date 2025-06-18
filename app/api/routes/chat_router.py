@@ -6,6 +6,7 @@ from api.schemas.chat_schema import ChatCreate, Chat as ChatSchema
 from api.models.chat_model import Chat as ChatModel
 from api.controllers.chat_controller import ChatController
 from core.database import get_database
+from core.security import get_current_active_user
 
 router = APIRouter(
     prefix="/chat",
@@ -18,15 +19,28 @@ def get_chat_controller(db=Depends(get_database)) -> ChatController:
     return controller
 
 @router.post("/", response_model=ChatSchema)
-async def create_chat(data: ChatCreate, controller: ChatController = Depends(get_chat_controller)):
+async def create_chat(
+    data: ChatCreate, 
+    controller: ChatController = Depends(get_chat_controller),
+    current_user: dict = Depends(get_current_active_user)
+):
     """Créer une nouvelle discussion."""
+    print(f"🚀 ROUTE DEBUG: create_chat called with data: {data}")
+    print(f"🚀 ROUTE DEBUG: current_user: {current_user['email']}")
+    print(f"🚀 ROUTE DEBUG: controller type: {type(controller)}")
+    
+    # Ajouter l'user_id depuis l'utilisateur connecté
+    data.user_id = current_user["_id"]
     result = await controller.create_chat(data)
     return result
 
 @router.get("/", response_model=List[ChatSchema])
-async def list_chats(user_id:str, controller: ChatController = Depends(get_chat_controller)):
-    """Lister toutes les discussions."""
-    return await controller.get_all_chats(user_id)
+async def list_chats(
+    controller: ChatController = Depends(get_chat_controller),
+    current_user: dict = Depends(get_current_active_user)
+):
+    """Lister toutes les discussions de l'utilisateur connecté."""
+    return await controller.get_all_chats(current_user["_id"])
 
 @router.get("/debug-test")
 async def test_debug():
@@ -34,17 +48,43 @@ async def test_debug():
     return {"message": "Debug test working", "status": "ok"}
 
 @router.get("/{chat_id}", response_model=ChatSchema)
-async def get_chat(chat_id: str, controller: ChatController = Depends(get_chat_controller)):
-    """Récupérer une discussion par son ID."""
+async def get_chat(
+    chat_id: str, 
+    controller: ChatController = Depends(get_chat_controller),
+    current_user: dict = Depends(get_current_active_user)
+):
+    """Récupérer une discussion par son ID (seulement si elle appartient à l'utilisateur)."""
     chat = await controller.get_chat_by_id(chat_id)
     if not chat:
         raise HTTPException(status_code=404, detail="Chat not found")
+    
+    # Vérifier que le chat appartient à l'utilisateur connecté
+    if chat.get("user_id") != current_user["_id"]:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
     return chat
 
 @router.delete("/{chat_id}")
-async def delete_chat(chat_id: str, controller: ChatController = Depends(get_chat_controller)):
-    """Supprimer une discussion par son ID."""
-    success = await controller.delete_chat(chat_id)
-    if not success:
-        raise HTTPException(status_code=404, detail="Chat not found")
-    return {"detail": "Deleted successfully"}
+async def delete_chat(
+    chat_id: str, 
+    controller: ChatController = Depends(get_chat_controller),
+    current_user: dict = Depends(get_current_active_user)
+):
+    """Supprimer une discussion par son ID (seulement si elle appartient à l'utilisateur)."""
+    try:
+        # Valider l'ObjectId
+        if not ObjectId.is_valid(chat_id):
+            raise HTTPException(status_code=400, detail="Invalid chat ID format")
+        
+        # Supprimer le chat avec vérification intégrée de propriété
+        success = await controller.delete_chat(chat_id, current_user["_id"])
+        if not success:
+            raise HTTPException(status_code=404, detail="Chat not found or access denied")
+        
+        return {"detail": "Chat deleted successfully"}
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Error deleting chat {chat_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error during chat deletion")

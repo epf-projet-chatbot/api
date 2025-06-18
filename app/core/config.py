@@ -16,7 +16,7 @@ class Settings(BaseSettings):
     
     # Configuration MongoDB
     mongodb_url: str = "mongodb://localhost:27017"
-    database_name: str = "chatbot"
+    database_name: str = "chatbot_db"
     
     # Configuration JWT
     secret_key: str = "your-secret-key-here-change-in-production"
@@ -24,7 +24,30 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int = 30
     
     # Configuration CORS
-    cors_origins: list[str] = ["*"]
+    cors_origins: str = "http://localhost:3000,https://badinter.epfprojets.com,http://badinter.epfprojets.com,badinter.epfprojets.com,https://api.badinter.epfprojets.com,http://api.badinter.epfprojets.com"
+    
+    @property 
+    def cors_origins_list(self) -> list[str]:
+        """Retourne la liste des origines CORS"""
+        if isinstance(self.cors_origins, str):
+            return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
+        return self.cors_origins
+    
+    
+    # Configuration des fichiers
+    base_url: str = "https://api.badinter.epfprojets.com"  # URL de base de l'API
+    # Configuration de l'environnement
+    environment: str = "development"  # "development" ou "production"
+    
+    @property
+    def is_production(self) -> bool:
+        """Vérifie si on est en production"""
+        return self.environment.lower() == "production"
+    
+    @property
+    def cookie_secure(self) -> bool:
+        """Détermine si les cookies doivent être sécurisés"""
+        return self.is_production
     
     class Config:
         env_file = ".env"
