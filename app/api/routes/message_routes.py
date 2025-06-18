@@ -3,7 +3,7 @@ from typing import List
 from bson import ObjectId
 from bson.errors import InvalidId
 
-from rag.chatbot_rag.answer import answer
+from rag.answer import generate_answer
 from ..controllers.message_controllers import get_all_messages_by_chat, get_message, create_message, delete_message
 from ..schemas.message_schemas import MessageCreate, BotQuery
 
@@ -58,8 +58,8 @@ async def create_bot_message(discussion_id: str, payload: BotQuery):
             raise HTTPException(status_code=400, detail="L'ID de la discussion et le contenu sont requis")
 
         
-        # Appel à la fonction answer pour générer la réponse du bot
-        response = answer(query)
+        # Appel à la fonction generate_answer pour générer la réponse du bot
+        response = generate_answer(query)
         
         # Créer le message avec le rôle "bot"
         message_id = await create_message(

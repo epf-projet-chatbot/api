@@ -1,23 +1,53 @@
+# ================================
+# 🚀 CHATBOT API DOCKER COMPOSE
+# ================================
+version: '3.8'
+
 services:
-  web:
-    build: .
+  # ================================
+  # 🤖 API SERVICE
+  # ================================
+  api:
+    build: 
+      context: ./api
+      dockerfile: Dockerfile
+    container_name: chatbot-api
     ports:
       - "8000:8000"
     environment:
       - MONGODB_URL=mongodb://mongo:27017
       - DATABASE_NAME=chatbot_db
+      - CHROMA_PATH=/app/chroma_db
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+      - SECRET_KEY=${SECRET_KEY:-your-secret-key-change-in-production}
+      - CORS_ORIGINS=http://localhost:3000,http://localhost:3001,http://127.0.0.1:3000,http://localhost:8080,http://127.0.0.1:8080
+      - BASE_URL=http://localhost:8000
     volumes:
-      - ./app:/app  # Mount le code source pour hot reload
+      - uploads-data:/app/uploads  # Persistent uploads
+      - chroma-data:/app/chroma_db  # Persistent vector database
     depends_on:
       mongo:
         condition: service_healthy
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - chatbot-network
 
+  # ================================
+  # 🗄️ MONGODB SERVICE
+  # ================================
   mongo:
-    image: mongo:6
-    container_name: mongodb
+    image: mongo:7-jammy
+    container_name: chatbot-mongo
     ports:
       - "27017:27017"
+    environment:
+      - MONGO_INITDB_DATABASE=chatbot_db
     volumes:
       - mongo-data:/data/db
     healthcheck:
@@ -27,6 +57,45 @@ services:
       retries: 5
       start_period: 30s
     restart: unless-stopped
+    networks:
+      - chatbot-network
 
+  # ================================
+  # 📊 MONGO EXPRESS (Optional - for DB management)
+  # ================================
+  mongo-express:
+    image: mongo-express:latest
+    container_name: chatbot-mongo-express
+    ports:
+      - "8081:8081"
+    environment:
+      - ME_CONFIG_MONGODB_SERVER=mongo
+      - ME_CONFIG_MONGODB_PORT=27017
+      - ME_CONFIG_BASICAUTH_USERNAME=admin
+      - ME_CONFIG_BASICAUTH_PASSWORD=admin123
+    depends_on:
+      mongo:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - chatbot-network
+    profiles:
+      - admin  # Only start with: docker-compose --profile admin up
+
+# ================================
+# 💾 PERSISTENT VOLUMES
+# ================================
 volumes:
   mongo-data:
+    driver: local
+  uploads-data:
+    driver: local
+  chroma-data:
+    driver: local
+
+# ================================
+# 🌐 NETWORKS
+# ================================
+networks:
+  chatbot-network:
+    driver: bridge

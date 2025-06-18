@@ -1,31 +1,123 @@
-fastapi==0.115.12
+# ================================
+# 🚀 API CORE DEPENDENCIES
+# ================================
+fastapi==0.115.9
 uvicorn[standard]==0.34.3
-beanie==1.29.0
+starlette==0.45.3
 
-# Authentification JWT
+# ================================
+# 🔐 AUTHENTIFICATION & SECURITY
+# ================================
 python-jose[cryptography]==3.3.0
 python-multipart==0.0.20
 passlib[bcrypt]==1.7.4
+bcrypt==4.3.0
+cryptography==45.0.4
 
-# MongoDB async
+# ================================
+# 🗄️ DATABASE & ODM
+# ================================
 motor==3.7.1
 pymongo==4.13.0
+beanie==1.29.0
 
-# Variables d'environnement
+# ================================
+# ⚙️ CONFIGURATION & VALIDATION
+# ================================
+pydantic>=2.11.0,<3.0.0
+pydantic-settings>=2.1.0,<3.0.0
+pydantic_core>=2.33.0,<3.0.0
+email-validator==2.2.0
 python-dotenv==1.1.0
 
-# Validation des schémas
-pydantic==2.11.5
-pydantic-settings==2.1.0
-email-validator==2.2.0
+# ================================
+# 🌐 HTTP & NETWORKING
+# ================================
+aiohttp==3.12.13
+aiofiles==24.1.0
+httpx==0.28.1
+httpcore==1.0.9
+requests==2.32.4
+h11==0.16.0
+httptools==0.6.4
+websockets==15.0.1
 
-# Core dependencies
+# ================================
+# 🤖 RAG & AI DEPENDENCIES
+# ================================
+# LangChain ecosystem
+langchain==0.3.25
+langchain-core==0.3.65
+langchain-community==0.3.25
+langchain-chroma==0.2.4
+langchain-google-genai==2.1.5
+langchain-text-splitters==0.3.8
+langsmith==0.3.45
+
+# Vector database
+chromadb>=0.5.0
+
+# Google AI
+google-ai-generativelanguage==0.6.18
+google-api-core==2.25.1
+google-auth==2.40.3
+
+# Text processing & NLP
+spacy==3.8.7
+fr_core_news_sm @ https://github.com/explosion/spacy-models/releases/download/fr_core_news_sm-3.8.0/fr_core_news_sm-3.8.0-py3-none-any.whl#sha256=7d6ad14cd5078e53147bfbf70fb9d433c6a3865b695fda2657140bbc59a27e29
+nltk==3.9.1
+jq>=1.0.0
+
+# Document processing
+pypdf==5.6.0
+unstructured==0.17.2
+unstructured-client==0.36.0
+python-magic==0.4.27
+markdown>=3.0.0
+
+# ================================
+# 📊 DATA PROCESSING
+# ================================
+numpy==2.3.0
+pandas==2.3.0
+pyarrow==20.0.0
+
+# ================================
+# 🛠️ UTILITIES & HELPERS
+# ================================
+# Core utilities
 annotated-types==0.7.0
-click==8.2.1
-dnspython==2.7.0
-pydantic_core==2.33.2
+typing_extensions==4.14.0
 typing-inspection==0.4.1
+click==8.2.1
+rich==14.0.0
 
-# Tests
-requests==2.32.3
-typing_extensions==4.13.2
+# File handling
+aiosignal==1.3.2
+anyio==4.9.0
+sniffio==1.3.1
+
+# Serialization
+orjson==3.10.18
+PyYAML==6.0.2
+
+# Progress & monitoring
+tqdm==4.67.1
+coloredlogs==15.0.1
+
+# ================================
+# 🧪 DEVELOPMENT & TESTING
+# ================================
+watchfiles==1.0.5
+
+# ================================
+# 📦 SYSTEM & INFRASTRUCTURE
+# ================================
+# Fix protobuf compatibility for ChromaDB
+protobuf>=3.20.0,<4.26.0
+
+dnspython==2.7.0
+certifi==2025.6.15
+urllib3==2.4.0
+idna==3.10
+charset-normalizer==3.4.2
