@@ -17,10 +17,9 @@ services:
     environment:
       - MONGODB_URL=mongodb://mongo:27017
       - DATABASE_NAME=chatbot_db
-      - CHROMA_PATH=/app/chroma_db
-      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
-      - SECRET_KEY=${SECRET_KEY:-your-secret-key-change-in-production}
-      - CORS_ORIGINS=http://localhost:3000,http://localhost:3001,http://127.0.0.1:3000,http://localhost:8080,http://127.0.0.1:8080
+      - CHROMA_PATH=./chroma_db
+      - GOOGLE_API_KEY=AIzaSyAyhGYRL5yAJkvbE9VMHwYaFsG7Q0zpcEo
+      - CORS_ORIGINS=http://localhost:3000,http://localhost:3001,http://localhost:3002,http://127.0.0.1:3000,http://localhost:8080,http://127.0.0.1:8080,https://badinter.epfprojets.com,http://badinter.epfprojets.com
       - BASE_URL=http://localhost:8000
     volumes:
       - uploads-data:/app/uploads  # Persistent uploads
@@ -39,7 +38,33 @@ services:
       - chatbot-network
 
   # ================================
-  # 🗄️ MONGODB SERVICE
+  # � FRONTEND SERVICE
+  # ================================
+  frontend:
+    build: 
+      context: ./legal-chatbot-front/front-noemie
+      dockerfile: Dockerfile
+    container_name: chatbot-frontend
+    ports:
+      - "3002:3000"
+    environment:
+      - NODE_ENV=production
+      - NEXT_PUBLIC_API_URL=https://badinter.epfprojets.com
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - chatbot-network
+
+  # ================================
+  # �🗄 MONGODB SERVICE
   # ================================
   mongo:
     image: mongo:7-jammy

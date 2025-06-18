@@ -24,7 +24,7 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int = 30
     
     # Configuration CORS
-    cors_origins: str = "http://localhost:3000,https://badinter.epfprojets.com,http://badinter.epfprojets.com,badinter.epfprojets.com"
+    cors_origins: str = "http://localhost:3000,https://badinter.epfprojets.com,http://badinter.epfprojets.com,badinter.epfprojets.com,https://api.badinter.epfprojets.com,http://api.badinter.epfprojets.com"
     
     @property 
     def cors_origins_list(self) -> list[str]:
@@ -33,8 +33,9 @@ class Settings(BaseSettings):
             return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
         return self.cors_origins
     
+    
     # Configuration des fichiers
-    base_url: str = "http://localhost:8000"  # URL de base de l'API
+    base_url: str = "https://api.badinter.epfprojets.com"  # URL de base de l'API
     # Configuration de l'environnement
     environment: str = "development"  # "development" ou "production"
     
