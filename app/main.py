@@ -95,7 +95,7 @@ async def read_root():
     }
 
 
-@app.get("/health", tags=["Health"])
+@app.get("/api/health", tags=["Health"])
 async def health_check():
     """Vérification de santé de l'API et de MongoDB"""
     logger.info("🏥 HEALTH CHECK: Endpoint called!")
