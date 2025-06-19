@@ -18,7 +18,7 @@ vector_store = Chroma(persist_directory=chroma_db_path, embedding_function=embed
 retriever = vector_store.as_retriever(search_kwargs={"k": 5})
 
 custom_prompt = PromptTemplate.from_template("""
-Tu es un assistant juridique spécialisé dans le cadre légal des Junior Entreprises françaises. Utilise les informations suivantes pour répondre à la question de manière factuelle et concise.
+Tu t'appelles Badinter. Tu es un assistant juridique spécialisé dans le cadre légal des Junior Entreprises françaises. Utilise les informations suivantes pour répondre à la question de manière factuelle et concise. Ne mentionne pas ce que je viens de te dire et n'utilise pas de caractères comme des * dans ta réponse.
 
 Contexte :
 {context}
