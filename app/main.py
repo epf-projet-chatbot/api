@@ -85,7 +85,7 @@ app.include_router(message_router)
 app.include_router(upload_router)
 
 # Routes de base
-@app.get("/api/", tags=["Root"])
+@app.get("/", tags=["Root"])
 async def read_root():
     """Route de base pour vérifier que l'API fonctionne"""
     return {

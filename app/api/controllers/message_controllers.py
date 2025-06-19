@@ -6,6 +6,56 @@ from datetime import datetime
 from typing import List
 
 
+def generate_chat_title(first_message: str, max_length: int = 50) -> str:
+    """
+    Génère un titre de chat basé sur le premier message de l'utilisateur
+    """
+    # Nettoyer le message
+    title = first_message.strip()
+    
+    # Si le message est trop long, le tronquer
+    if len(title) > max_length:
+        title = title[:max_length-3] + "..."
+    
+    # Si le message est vide ou trop court, utiliser un titre par défaut
+    if len(title) < 3:
+        title = "Nouvelle discussion"
+    
+    return title
+
+async def update_chat_title_if_first_user_message(discussion_id: str, content: str):
+    """
+    Met à jour le titre du chat avec le premier message utilisateur si c'est le cas
+    """
+    from api.repositories.chat_repository import ChatRepository
+    
+    db = get_database()
+    print(f"🔍 Vérification de la mise à jour du titre pour discussion: {discussion_id}")
+    
+    # Vérifier s'il y a déjà des messages utilisateur dans cette discussion
+    existing_user_messages = await db.messages.count_documents({
+        "discussion_id": ObjectId(discussion_id),
+        "role": "user"
+    })
+    
+    print(f"📊 Nombre de messages utilisateur existants: {existing_user_messages}")
+    
+    # Si c'est le premier message utilisateur (count = 1), mettre à jour le titre
+    if existing_user_messages == 1:
+        chat_repo = ChatRepository(db)
+        new_title = generate_chat_title(content)
+        
+        print(f"🎯 Mise à jour du titre vers: '{new_title}'")
+        result = await chat_repo.update_chat(discussion_id, {"topic": new_title})
+        
+        if result:
+            print(f"✅ Titre du chat mis à jour avec succès: '{new_title}'")
+        else:
+            print(f"❌ Échec de la mise à jour du titre")
+    else:
+        print(f"⏭️ Pas le premier message utilisateur, titre non modifié")
+
+
 async def get_all_messages_by_chat(discussion:str):
     db = get_database()
     try:
@@ -67,7 +117,13 @@ async def create_message(discussion: str, content: str, role: str = "user", atta
             message_data["attachments"] = []
         
         cursor = await db.messages.insert_one(message_data)
-        return str(cursor.inserted_id)
+        message_id = str(cursor.inserted_id)
+        
+        # Si c'est un message utilisateur, vérifier si le titre du chat doit être mis à jour
+        if role == "user":
+            await update_chat_title_if_first_user_message(str(discussion), content)
+        
+        return message_id
     except Exception as e:
         raise ValueError(f"Error creating message: {str(e)}")
     

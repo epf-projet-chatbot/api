@@ -24,7 +24,7 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int = 30
     
     # Configuration CORS
-    cors_origins: str = "http://localhost:3000,https://badinter.epfprojets.com,http://badinter.epfprojets.com,badinter.epfprojets.com,https://api.badinter.epfprojets.com,http://api.badinter.epfprojets.com"
+    cors_origins: str = "https://badinter.epfprojets.com,http://badinter.epfprojets.com,badinter.epfprojets.com,https://api.badinter.epfprojets.com,http://api.badinter.epfprojets.com,http://badinter-projet.epfprojets.com,https://badinter-projet.epfprojets.com"
     
     @property 
     def cors_origins_list(self) -> list[str]:
