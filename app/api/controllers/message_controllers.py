@@ -139,3 +139,40 @@ async def delete_message(message: str):
         raise ValueError(f"Invalid ObjectId format for message_id: {message_id}")
     except Exception as e:
         raise ValueError(f"Error deleting message: {str(e)}")
+
+async def get_conversation_history(discussion_id: str, limit: int = 10) -> List[dict]:
+    """
+    Récupère l'historique des messages d'une conversation
+    Args:
+        discussion_id: ID de la discussion
+        limit: Nombre maximum de messages récents à récupérer (par défaut 10)
+    Returns:
+        Liste des messages triés par date de création (plus anciens en premier)
+    """
+    db = get_database()
+    try:
+        discussion_obj_id = ObjectId(discussion_id)
+        
+        # Récupérer les messages triés par date de création (plus récents d'abord)
+        cursor = db.messages.find(
+            {"discussion_id": discussion_obj_id}
+        ).sort("date_created", -1).limit(limit)
+        
+        messages = []
+        async for msg in cursor:
+            # Simplifier le message pour le contexte
+            simplified_msg = {
+                "role": msg.get("role", "user"),
+                "content": msg.get("content", ""),
+                "date_created": msg.get("date_created")
+            }
+            messages.append(simplified_msg)
+        
+        # Inverser pour avoir les plus anciens en premier
+        messages.reverse()
+        return messages
+    
+    except InvalidId:
+        raise ValueError(f"Invalid ObjectId format for discussion_id: {discussion_id}")
+    except Exception as e:
+        raise ValueError(f"Error fetching conversation history: {str(e)}")

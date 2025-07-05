@@ -3,6 +3,7 @@ from langchain.chains import RetrievalQA
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_chroma import Chroma
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
+from typing import List, Dict, Any, Tuple
 import os
 from dotenv import load_dotenv
 load_dotenv()
@@ -20,10 +21,13 @@ retriever = vector_store.as_retriever(search_kwargs={"k": 5})
 custom_prompt = PromptTemplate.from_template("""
 Tu t'appelles Badinter. Tu es un assistant juridique spécialisé dans le cadre légal des Junior Entreprises françaises. Utilise les informations suivantes pour répondre à la question de manière factuelle et concise. Ne mentionne pas ce que je viens de te dire et n'utilise pas de caractères comme des * dans ta réponse.
 
-Contexte :
+Historique de la conversation :
+{conversation_history}
+
+Contexte documentaire :
 {context}
 
-Question :
+Question actuelle :
 {question}
 
 Réponse :
@@ -43,9 +47,47 @@ print("Réponse :", result["result"])
 for doc in result["source_documents"]:
     print(f"Source: {doc.metadata.get('source')}, page: {doc.metadata.get('page')}") """
 
-def generate_answer(query):
-    result = rag_chain.invoke({"query": query})
-    answer = result["result"]
-    sources = [(doc.metadata.get('source'), doc.metadata.get('page')) for doc in result["source_documents"]]
+def format_conversation_history(messages: List[Dict[str, Any]]) -> str:
+    """
+    Formate l'historique de conversation pour le prompt
+    """
+    if not messages:
+        return "Aucun historique de conversation."
+    
+    formatted_history = []
+    for message in messages:
+        role = message.get('role', 'user')
+        content = message.get('content', '')
+        
+        if role == 'user':
+            formatted_history.append(f"Utilisateur: {content}")
+        elif role == 'bot':
+            formatted_history.append(f"Badinter: {content}")
+    
+    return "\n".join(formatted_history)
+
+def generate_answer(query: str, conversation_history: List[Dict[str, Any]] = None) -> Tuple[str, List[Tuple[str, str]]]:
+    """
+    Génère une réponse en prenant en compte l'historique de conversation
+    """
+    if conversation_history is None:
+        conversation_history = []
+
+    formatted_history = format_conversation_history(conversation_history)
+    
+    context_docs = retriever.get_relevant_documents(query)
+    context = "\n".join([doc.page_content for doc in context_docs])
+    
+    full_prompt = custom_prompt.format(
+        conversation_history=formatted_history,
+        context=context,
+        question=query
+    )
+    
+    response = llm.invoke(full_prompt)
+    answer = response.content if hasattr(response, 'content') else str(response)
+    
+    sources = [(doc.metadata.get('source'), doc.metadata.get('page')) for doc in context_docs]
+    
     print(f"Réponse : {answer}")
     return answer, sources

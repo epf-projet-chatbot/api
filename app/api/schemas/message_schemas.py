@@ -70,3 +70,15 @@ class MessageResponse(BaseModel):
         
 class BotQuery(BaseModel):
     query: str
+
+class BotQueryWithHistory(BaseModel):
+    query: str = Field(..., description="Question à poser au chatbot")
+    history_limit: Optional[int] = Field(10, description="Nombre de messages d'historique à inclure (défaut: 10, max: 50)")
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "query": "Quelles sont les obligations d'une Junior Entreprise ?",
+                "history_limit": 15
+            }
+        }
