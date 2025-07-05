@@ -22,12 +22,11 @@ services:
       - CORS_ORIGINS=http://localhost:3000,http://localhost:3001,http://localhost:3002,http://127.0.0.1:3000,http://127.0.0.1:3001,http://127.0.0.1:3002
       - BASE_URL=http://localhost:8000
       - ENVIRONMENT=development
-      - PYTHONPATH=/workdir:/workdir/app
+      - PYTHONPATH=/app
     volumes:
-      - uploads-data:/workdir/uploads  # Persistent uploads
-      - chroma-data:/workdir/chroma_db  # Persistent vector database
-      - .:/workdir  # Volume de développement pour hot reload - tout le projet
-    working_dir: /workdir/app
+      - uploads-data:/app/uploads  # Persistent uploads
+      - chroma-data:/app/chroma_db  # Persistent vector database
+    working_dir: /app
     depends_on:
       mongo:
         condition: service_healthy

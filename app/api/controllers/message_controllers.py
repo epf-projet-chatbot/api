@@ -4,6 +4,7 @@ from bson.errors import InvalidId
 from core.database import get_database
 from datetime import datetime
 from typing import List
+from api.repositories.chat_repository import ChatRepository
 
 
 def generate_chat_title(first_message: str, max_length: int = 50) -> str:
@@ -23,22 +24,18 @@ def generate_chat_title(first_message: str, max_length: int = 50) -> str:
     
     return title
 
-async def update_chat_title_if_first_user_message(discussion_id: str, content: str):
+async def update_chat_title(discussion_id: str, content: str):
     """
     Met à jour le titre du chat avec le premier message utilisateur si c'est le cas
     """
-    from api.repositories.chat_repository import ChatRepository
     
     db = get_database()
-    print(f"🔍 Vérification de la mise à jour du titre pour discussion: {discussion_id}")
-    
+
     # Vérifier s'il y a déjà des messages utilisateur dans cette discussion
     existing_user_messages = await db.messages.count_documents({
         "discussion_id": ObjectId(discussion_id),
         "role": "user"
     })
-    
-    print(f"📊 Nombre de messages utilisateur existants: {existing_user_messages}")
     
     # Si c'est le premier message utilisateur (count = 1), mettre à jour le titre
     if existing_user_messages == 1:
@@ -121,7 +118,7 @@ async def create_message(discussion: str, content: str, role: str = "user", atta
         
         # Si c'est un message utilisateur, vérifier si le titre du chat doit être mis à jour
         if role == "user":
-            await update_chat_title_if_first_user_message(str(discussion), content)
+            await update_chat_title(str(discussion), content)
         
         return message_id
     except Exception as e:
@@ -173,6 +170,7 @@ async def get_conversation_history(discussion_id: str, limit: int = 10) -> List[
         return messages
     
     except InvalidId:
+        print("hello")
         raise ValueError(f"Invalid ObjectId format for discussion_id: {discussion_id}")
     except Exception as e:
         raise ValueError(f"Error fetching conversation history: {str(e)}")
