@@ -36,8 +36,6 @@ RUN pip install --no-cache-dir --upgrade pip && \
 # Copy application code (structure correcte)
 COPY app/ ./
 COPY rag/ ./rag/
-COPY launch_embedding.sh /app/launch_embedding.sh
-RUN chmod +x /app/launch_embedding.sh
 
 # ================================
 # ⚙️ ENVIRONMENT SETUP
@@ -53,4 +51,4 @@ RUN mkdir -p /app/uploads
 # ================================
 EXPOSE 8000
 
-ENTRYPOINT ["/app/launch_embedding.sh"]
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]

@@ -13,7 +13,8 @@ llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash", temperature=0.2, google_a
 embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
 
 # Chemin de la base de données Chroma adapté pour Docker et développement local
-chroma_db_path = os.path.join(os.path.dirname(__file__), "chroma_db")
+chroma_db_path = os.getenv("CHROMA_PATH", os.path.join(os.path.dirname(__file__), "chroma_db"))
+
 
 vector_store = Chroma(persist_directory=chroma_db_path, embedding_function=embeddings)
 retriever = vector_store.as_retriever(search_kwargs={"k": 5})

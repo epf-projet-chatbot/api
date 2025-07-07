@@ -5,16 +5,38 @@ import getpass
 import os
 from dotenv import load_dotenv
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
+import time
+import requests
 
 # Load environment variables first
 load_dotenv()
 
 # Chemin de la base de données Chroma adapté pour être au même niveau qu'answer.py
-CHROMA_PATH = os.path.join(os.path.dirname(__file__), "chroma_db")
+CHROMA_PATH = os.getenv("CHROMA_PATH", os.path.join(os.path.dirname(__file__), "chroma_db"))
+
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 
 # Initialisation des embeddings
 embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001", google_api_key=GOOGLE_API_KEY)
+
+def wait_for_api(url: str, timeout: int = 340):
+    """
+    Attend que l'API soit disponible (code HTTP 200) car sinon problème.
+    """
+    print(f"⏳ Attente que l'API soit disponible à {url} ...")
+    for i in range(timeout):
+        try:
+            response = requests.get(url)
+            if response.status_code == 200:
+                print("✅ API disponible !")
+                return
+        except Exception:
+            pass
+        time.sleep(1)
+    raise Exception("❌ L'API n'est toujours pas disponible après le timeout.")
+
+
+
 
 def embed(text: str) -> list[float]:
     """
@@ -43,7 +65,8 @@ def add_to_chroma(chunks: list[Document]):
     """
     try:
         db = Chroma(persist_directory=CHROMA_PATH, embedding_function=embeddings)
-        max =db._client.get_max_batch_size()
+        max_v1 =db._client.get_max_batch_size()
+        max_min_google=10
         # Obtenir les IDs existants pour éviter les doublons
         existing_ids = set()
         try:
@@ -74,11 +97,13 @@ def add_to_chroma(chunks: list[Document]):
             existing_ids.add(chunk_id)
         
         # Ajouter les documents par paquets de taille max
-        for i in range(0, len(chunks), max):
-            batch_chunks = chunks[i:i + max]
-            batch_ids = chunk_ids[i:i + max]
+        for i in range(0, len(chunks), max_v1):
+            batch_chunks = chunks[i:i + max_v1]
+            batch_ids = chunk_ids[i:i + max_v1]
             db.add_documents(batch_chunks, ids=batch_ids)
             print(f"{len(chunks)} chunks ajoutés à la base de données Chroma.")
+            time.sleep(1)
+
         
     except Exception as e:
         print(f"Erreur lors de l'ajout à Chroma : {e}")
@@ -88,7 +113,8 @@ if __name__ == "__main__":
     Point d'entrée pour le script.
     Charge les documents, les prétraite, les vectorise et les ajoute à la base de données Chroma.
     """
-    
+    wait_for_api("http://api:8000/api/health")
+
     # Chargement et ajout des documents
     script_dir = os.path.dirname(os.path.abspath(__file__))
     data_path = os.path.join(script_dir, "data", "data_complete")
