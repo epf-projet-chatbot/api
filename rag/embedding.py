@@ -82,14 +82,31 @@ def add_to_chroma(chunks: list[Document]):
         raise Exception(f"Erreur Chroma: {e}")
 
 if __name__ == "__main__":
+    print("🔍 Starting embedding process...")
+    print("⏳ Waiting for API to be ready...")
     wait_for_api("http://api:8000/api/health")
+    print("✅ API is ready!")
     
     script_dir = os.path.dirname(os.path.abspath(__file__))
     data_path = os.path.join(script_dir, "data", "data_complete")
     
+    print(f"📁 Looking for data in: {data_path}")
+    
     if not os.path.exists(data_path):
+        print(f"❌ ERROR: Data path does not exist: {data_path}")
         exit(1)
     
+    print(f"✅ Data path exists!")
+    print(f"📄 Processing documents from {data_path}...")
+    
     documents = process_documents(data_path)
+    
     if documents:
+        print(f"✅ Found {len(documents)} documents")
+        print(f"🔄 Adding documents to ChromaDB...")
         add_to_chroma(documents)
+        print(f"✅ Embedding completed successfully! {len(documents)} documents added to ChromaDB")
+    else:
+        print(f"⚠️  No documents found to process")
+    
+    print("🎉 Embedding process finished!")

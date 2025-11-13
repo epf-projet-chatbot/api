@@ -11,6 +11,7 @@ from core.database import db_manager, get_database
 from core.security import get_current_active_user
 
 from api.routes import auth_router, chat_router, message_router, upload_router
+from api.routes.template_routes import router as template_router
 
 # Configuration du logging
 logging.basicConfig(level=logging.INFO)
@@ -64,6 +65,7 @@ app.include_router(auth_router)
 app.include_router(chat_router)
 app.include_router(message_router)
 app.include_router(upload_router)
+app.include_router(template_router)
 
 # Routes de base
 @app.get("/", tags=["Root"])
