@@ -20,54 +20,33 @@ GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001", google_api_key=GOOGLE_API_KEY)
 
 def wait_for_api(url: str, timeout: int = 340):
-    """
-    Attend que l'API soit disponible (code HTTP 200) car sinon problème.
-    """
-    print(f"⏳ Attente que l'API soit disponible à {url} ...")
+    """Attend que l'API soit disponible"""
     for i in range(timeout):
         try:
             response = requests.get(url)
             if response.status_code == 200:
-                print("✅ API disponible !")
                 return
         except Exception:
             pass
         time.sleep(1)
-    raise Exception("❌ L'API n'est toujours pas disponible après le timeout.")
+    raise Exception("API timeout")
 
 
 
 
 def embed(text: str) -> list[float]:
-    """
-    Vectorise un texte en utilisant Google Generative AI Embeddings.
-    
-    Args:
-        text (str): Le texte à vectoriser.
-        
-    Returns:
-        list[float]: Le vecteur d'embedding du texte.
-    """
+    """Vectorise un texte avec Google Generative AI"""
     try:
-        # Utilisation de l'API LangChain pour générer l'embedding
-        result = embeddings.embed_query(text)
-        return result
-    except Exception as e:
-        print(f"Erreur lors de la vectorisation : {e}")
+        return embeddings.embed_query(text)
+    except Exception:
         return []
 
 def add_to_chroma(chunks: list[Document]):
-    """
-    Ajoute des chunks à la base de données Chroma.
-    
-    Args:
-        chunks (list[Document]): Liste de documents à ajouter.
-    """
+    """Ajoute des chunks à Chroma"""
     try:
         db = Chroma(persist_directory=CHROMA_PATH, embedding_function=embeddings)
-        max_v1 =db._client.get_max_batch_size()
-        max_min_google=10
-        # Obtenir les IDs existants pour éviter les doublons
+        max_v1 = db._client.get_max_batch_size()
+        
         existing_ids = set()
         try:
             existing_collection = db.get()
@@ -81,11 +60,8 @@ def add_to_chroma(chunks: list[Document]):
         for i, chunk in enumerate(chunks):
             source = chunk.metadata.get('source', 'unknown')
             page = chunk.metadata.get('page', 0)
-            
-            # Format: document_id:page_id:chunk_index
             chunk_id = f"{source}:{page}:{i}"
             
-            # S'assurer qu'il n'y a pas de doublons
             counter = 0
             original_chunk_id = chunk_id
             while chunk_id in existing_ids or chunk_id in chunk_ids:
@@ -96,35 +72,24 @@ def add_to_chroma(chunks: list[Document]):
             chunk_ids.append(chunk_id)
             existing_ids.add(chunk_id)
         
-        # Ajouter les documents par paquets de taille max
         for i in range(0, len(chunks), max_v1):
             batch_chunks = chunks[i:i + max_v1]
             batch_ids = chunk_ids[i:i + max_v1]
             db.add_documents(batch_chunks, ids=batch_ids)
-            print(f"{len(chunks)} chunks ajoutés à la base de données Chroma.")
             time.sleep(1)
-
         
     except Exception as e:
-        print(f"Erreur lors de l'ajout à Chroma : {e}")
+        raise Exception(f"Erreur Chroma: {e}")
 
 if __name__ == "__main__":
-    """
-    Point d'entrée pour le script.
-    Charge les documents, les prétraite, les vectorise et les ajoute à la base de données Chroma.
-    """
     wait_for_api("http://api:8000/api/health")
-
-    # Chargement et ajout des documents
+    
     script_dir = os.path.dirname(os.path.abspath(__file__))
     data_path = os.path.join(script_dir, "data", "data_complete")
+    
     if not os.path.exists(data_path):
-        print(f"Erreur : Le répertoire {data_path} n'existe pas.")
         exit(1)
     
     documents = process_documents(data_path)
     if documents:
         add_to_chroma(documents)
-        print("Chroma DB mise à jour avec succès.")
-    else:
-        print("Aucun document trouvé à traiter.")

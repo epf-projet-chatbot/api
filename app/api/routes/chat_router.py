@@ -25,9 +25,6 @@ async def create_chat(
     current_user: dict = Depends(get_current_active_user)
 ):
     """Créer une nouvelle discussion."""
-    print(f"🚀 ROUTE DEBUG: create_chat called with data: {data}")
-    print(f"🚀 ROUTE DEBUG: current_user: {current_user['email']}")
-    print(f"🚀 ROUTE DEBUG: controller type: {type(controller)}")
     
     # Ajouter l'user_id depuis l'utilisateur connecté
     data.user_id = current_user["_id"]
@@ -86,5 +83,4 @@ async def delete_chat(
     except HTTPException:
         raise
     except Exception as e:
-        print(f"❌ Error deleting chat {chat_id}: {str(e)}")
         raise HTTPException(status_code=500, detail="Internal server error during chat deletion")

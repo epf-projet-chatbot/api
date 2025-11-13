@@ -32,8 +32,8 @@ class ChatController:
             inserted_doc["id"] = str(inserted_doc["_id"])
             del inserted_doc["_id"]
             return inserted_doc
-        else:
-            return chat_dict
+        
+        return chat_dict
 
     async def get_all_chats(self, user_id: str) -> List[Dict[str, Any]]:
         cursor = self.collection.find({"user_id": user_id})
@@ -98,7 +98,6 @@ class ChatController:
             return chat_deleted
             
         except Exception as e:
-            print(f"❌ Error in delete_chat: {str(e)}")
             import traceback
             traceback.print_exc()
             return False
@@ -115,7 +114,6 @@ class ChatController:
             return result.deleted_count
             
         except Exception as e:
-            print(f"❌ Error deleting messages: {str(e)}")
             return 0
 
     async def _delete_chat_files(self, chat_id: str) -> int:
@@ -148,10 +146,6 @@ class ChatController:
                                 # fichier système de fichiers
                                 filename = url.split("/files/")[-1]
                                 file_ids_to_delete.append(("filesystem", filename))
-                        else:
-                            print(f"⚠️ Attachment has no URL: {attachment}")
-                else:
-                    print(f"🔍 No attachments found in message {message.get('_id')}")
             
             # supprimer les fichiers GridFS
             gridfs_bucket = AsyncIOMotorGridFSBucket(self.database, bucket_name="files")
@@ -172,12 +166,9 @@ class ChatController:
                         result = await self.database.uploads.delete_many({"filename": file_id})
                         
                 except Exception as e:
-                    print(f"Error deleting file {file_id}: {str(e)}")
                     continue
             
-            print(f"Total files deleted: {deleted_count}")
             return deleted_count
             
         except Exception as e:
-            print(f"Error deleting chat files: {str(e)}")
             return 0

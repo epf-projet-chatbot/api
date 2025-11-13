@@ -19,8 +19,6 @@ class UploadController:
         
         self.gridfs_bucket = AsyncIOMotorGridFSBucket(database, bucket_name="files")
         
-        print(f"🏗️ CONSTRUCTOR: UploadController init with database: {self.database}")
-        print(f"🏗️ CONSTRUCTOR: GridFS bucket: {self.gridfs_bucket}")
 
     async def upload_file_to_db(self, file: UploadFile, user_id: Optional[str] = None) -> Dict[str, Any]:
         """
@@ -56,7 +54,6 @@ class UploadController:
             
             file_url = f"{settings.base_url}/upload/gridfs/{str(file_id)}"
             
-            print(f"📁 File uploaded to GridFS: {file.filename} (ID: {file_id}, {file_size} bytes)")
             
             return {
                 "id": str(file_id),
@@ -71,7 +68,6 @@ class UploadController:
             }
             
         except Exception as e:
-            print(f"❌ GridFS upload error: {str(e)}")
             raise HTTPException(status_code=500, detail=f"Erreur lors de l'upload GridFS: {str(e)}")
 
     async def get_gridfs_files(self, user_id: str) -> List[Dict[str, Any]]:
@@ -81,7 +77,6 @@ class UploadController:
         try:
             files = []
             
-            print(f"🔍 Searching GridFS files for user_id: {user_id}")
             
             files_collection = self.database.get_collection("files.files")
             cursor = files_collection.find({
@@ -92,7 +87,6 @@ class UploadController:
             })
             
             async for grid_file in cursor:
-                print(f"🔍 Found GridFS file: {grid_file.get('filename')} (user_id: {grid_file.get('metadata', {}).get('user_id')})")
                 
                 file_data = {
                     "id": str(grid_file["_id"]),
@@ -107,7 +101,6 @@ class UploadController:
                 }
                 files.append(file_data)
             
-            print(f"🔍 Found {len(files)} GridFS files for user {user_id}")
             return files
             
         except Exception as e:
@@ -121,11 +114,9 @@ class UploadController:
         try:
             active_files = []
             
-            print(f"🔍 Searching active GridFS files for user_id: {user_id}")
             
             # 1. Récupérer tous les fichiers GridFS de l'utilisateur
             all_files = await self.get_gridfs_files(user_id)
-            print(f"🔍 Found {len(all_files)} total GridFS files for user")
             
             for file_data in all_files:
                 file_id = file_data["id"]
@@ -140,10 +131,7 @@ class UploadController:
                 })
                 
                 if message_with_file:
-                    print(f"✅ File {file_data['filename']} is active (linked to message {message_with_file.get('_id')})")
                     active_files.append(file_data)
-                else:
-                    print(f"🗑️ File {file_data['filename']} is orphaned (no message references it)")
             
             return active_files
             
@@ -159,7 +147,6 @@ class UploadController:
     
             
             all_files = await self.get_gridfs_files(user_id)
-            print(f"🔍 Found {len(all_files)} total GridFS files for user")
             
             for file_data in all_files:
                 file_id = file_data["id"]
@@ -174,16 +161,11 @@ class UploadController:
                 
                 if not message_with_file:
                     try:
-                        print(f"🗑️ Deleting orphaned file: {file_data['filename']} ({file_id})")
                         await self.gridfs_bucket.delete(ObjectId(file_id))
                         deleted_count += 1
-                        print(f"✅ Deleted orphaned file: {file_id}")
                     except Exception as e:
-                        print(f"❌ Error deleting orphaned file {file_id}: {str(e)}")
                         continue
-                else:
-                    print(f"✅ File {file_data['filename']} is active (keeping it)")
-        
+            
             return deleted_count
             
         except Exception as e:
@@ -207,7 +189,6 @@ class UploadController:
             return content, metadata
             
         except Exception as e:
-            print(f"❌ Error getting GridFS file content: {str(e)}")
             raise HTTPException(status_code=404, detail="Fichier non trouvé dans GridFS")
 
     async def delete_gridfs_file(self, file_id: str, user_id: Optional[str] = None) -> bool:
@@ -220,26 +201,20 @@ class UploadController:
             grid_file = await files_collection.find_one({"_id": ObjectId(file_id)})
             
             if not grid_file:
-                print(f"❌ GridFS file not found: {file_id}")
                 return False
             
             if user_id:
                 metadata = grid_file.get("metadata", {})
                 file_user_id = metadata.get("user_id") if metadata else None
-            
+                
                 if str(file_user_id) != str(user_id):
-                    print(f"❌ Access denied: file belongs to {file_user_id}, not {user_id}")
                     return False
-                else:
-                    print(f"✅ Access granted: user IDs match")
             
             await self.gridfs_bucket.delete(ObjectId(file_id))
             
-            print(f"🗑️ GridFS file deleted successfully: {file_id}")
             return True
             
         except Exception as e:
-            print(f"❌ Error deleting GridFS file: {str(e)}")
             return False
 
 

@@ -119,48 +119,38 @@ async def get_current_user(
     authorization = request.headers.get("Authorization")
     if authorization and authorization.startswith("Bearer "):
         token = authorization.split(" ")[1]
-        print(f"🔍 Token from header: {token[:20]}...")
     else:
         # Puis essayer le cookie
         cookie_token = request.cookies.get("access_token")
-        print(f"🔍 Cookie found: {cookie_token[:50] if cookie_token else 'None'}...")
         
         if cookie_token:
             # Nettoyer le cookie et l'utiliser directement (plus de "Bearer ")
             token = cookie_token.strip('"\'')
-            print(f"🔍 Token from cookie: {token[:20]}...")
     
     if not token:
-        print("🔍 No token found in header or cookie")
         raise credentials_exception
     
     # Vérifier le token
     user_id = verify_token(token)
-    print(f"🔍 Token verification result: {user_id}")
     
     if user_id is None:
-        print("🔍 Token verification failed")
         raise credentials_exception
     
     # Récupérer l'utilisateur depuis MongoDB
     try:
         # Le token contient l'ID utilisateur, pas l'email
         if not ObjectId.is_valid(user_id):
-            print(f"🔍 Invalid ObjectId: {user_id}")
             raise credentials_exception
             
         user = await db.users.find_one({"_id": ObjectId(user_id)})
         if user is None:
-            print(f"🔍 User not found for ID: {user_id}")
             raise credentials_exception
         
-        print(f"🔍 User found: {user['email']}")
         # Convertir ObjectId en string pour la sérialisation
         user["_id"] = str(user["_id"])
         return user
         
     except Exception as e:
-        print(f"🔍 Database error: {e}")
         raise credentials_exception
 
 

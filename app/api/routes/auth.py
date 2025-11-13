@@ -72,7 +72,6 @@ async def login(
             path="/", 
         )
         
-        print(f"🍪 Cookie défini: access_token = {token_data.access_token[:20]}...")
         
         return {
             "message": "Connexion réussie",

@@ -20,44 +20,25 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Gestionnaire de cycle de vie de l'application"""
-    print("Starting application lifespan...")
-    
-    # Startup avec retries pour MongoDB
     import asyncio
     max_retries = 10
     retry_delay = 2
     
-    print(f"Configuration loaded:")
-    print(f"   - MongoDB URL: {settings.mongodb_url}")
-    print(f"   - Database: {settings.database_name}")
-    print(f"   - App Name: {settings.app_name}")
-    
     for attempt in range(max_retries):
         try:
-            print(f"🔄 Attempt {attempt + 1}/{max_retries}: Connecting to MongoDB...")
             await db_manager.connect_to_mongo()
-            
-            print(f"🔄 Attempt {attempt + 1}/{max_retries}: Creating indexes...")
             await db_manager.create_indexes()
-            
-            print("Application started successfully")
             break
         except Exception as e:
             if attempt < max_retries - 1:
-                print(f"Attempt {attempt + 1}/{max_retries} failed: {e}")
-                print(f"Retrying in {retry_delay} seconds...")
                 await asyncio.sleep(retry_delay)
             else:
-                print(f"Startup error after {max_retries} attempts: {e}")
+                logger.error(f"Startup error after {max_retries} attempts: {e}")
                 raise
     
-    print("🎯 Lifespan startup completed, yielding control...")
     yield
     
-    # Shutdown
-    print("Starting application shutdown...")
     await db_manager.close_mongo_connection()
-    print("Application shutdown complete")
 
 
 # Création de l'application FastAPI
@@ -97,16 +78,12 @@ async def read_root():
 
 @app.get("/api/health", tags=["Health"])
 async def health_check():
-    """Vérification de santé de l'API et de MongoDB"""
-    logger.info("🏥 HEALTH CHECK: Endpoint called!")
+    """Vérification de santé de l'API"""
     try:
-        # Test de connexion MongoDB simple et efficace
         if db_manager.database is None:
             raise RuntimeError("Database not connected")
         
-        # Test simple avec list_collection_names() qui fonctionne toujours
         collections = await db_manager.database.list_collection_names()
-        logger.info(f"🏥 HEALTH CHECK: Found {len(collections)} collections")
         
         return {
             "status": "healthy", 
@@ -116,7 +93,6 @@ async def health_check():
             "collections_count": len(collections)
         }
     except Exception as e:
-        logger.error(f"🏥 HEALTH CHECK ERROR: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail=f"Database connection failed: {str(e)}"

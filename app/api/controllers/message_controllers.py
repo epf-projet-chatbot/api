@@ -8,49 +8,26 @@ from api.repositories.chat_repository import ChatRepository
 
 
 def generate_chat_title(first_message: str, max_length: int = 50) -> str:
-    """
-    Génère un titre de chat basé sur le premier message de l'utilisateur
-    """
-    # Nettoyer le message
+    """Génère un titre de chat basé sur le premier message"""
     title = first_message.strip()
-    
-    # Si le message est trop long, le tronquer
     if len(title) > max_length:
         title = title[:max_length-3] + "..."
-    
-    # Si le message est vide ou trop court, utiliser un titre par défaut
     if len(title) < 3:
         title = "Nouvelle discussion"
-    
     return title
 
 async def update_chat_title(discussion_id: str, content: str):
-    """
-    Met à jour le titre du chat avec le premier message utilisateur si c'est le cas
-    """
-    
+    """Met à jour le titre du chat avec le premier message"""
     db = get_database()
-
-    # Vérifier s'il y a déjà des messages utilisateur dans cette discussion
     existing_user_messages = await db.messages.count_documents({
         "discussion_id": ObjectId(discussion_id),
         "role": "user"
     })
     
-    # Si c'est le premier message utilisateur (count = 1), mettre à jour le titre
     if existing_user_messages == 1:
         chat_repo = ChatRepository(db)
         new_title = generate_chat_title(content)
-        
-        print(f"🎯 Mise à jour du titre vers: '{new_title}'")
-        result = await chat_repo.update_chat(discussion_id, {"topic": new_title})
-        
-        if result:
-            print(f"✅ Titre du chat mis à jour avec succès: '{new_title}'")
-        else:
-            print(f"❌ Échec de la mise à jour du titre")
-    else:
-        print(f"⏭️ Pas le premier message utilisateur, titre non modifié")
+        await chat_repo.update_chat(discussion_id, {"topic": new_title})
 
 
 async def get_all_messages_by_chat(discussion:str):
@@ -81,8 +58,8 @@ async def get_message(message: str):
     if cursor:
         cursor["_id"] = str(cursor["_id"])
         return cursor
-    else:
-        raise ValueError(f"Message with id {message_id} not found")
+    
+    raise ValueError(f"Message with id {message_id} not found")
 
 async def create_message(discussion: str, content: str, role: str = "user", attachments: List[dict] = None):
     db = get_database()
@@ -138,26 +115,16 @@ async def delete_message(message: str):
         raise ValueError(f"Error deleting message: {str(e)}")
 
 async def get_conversation_history(discussion_id: str, limit: int = 10) -> List[dict]:
-    """
-    Récupère l'historique des messages d'une conversation
-    Args:
-        discussion_id: ID de la discussion
-        limit: Nombre maximum de messages récents à récupérer (par défaut 10)
-    Returns:
-        Liste des messages triés par date de création (plus anciens en premier)
-    """
+    """Récupère l'historique des messages"""
     db = get_database()
     try:
         discussion_obj_id = ObjectId(discussion_id)
-        
-        # Récupérer les messages triés par date de création (plus récents d'abord)
         cursor = db.messages.find(
             {"discussion_id": discussion_obj_id}
         ).sort("date_created", -1).limit(limit)
         
         messages = []
         async for msg in cursor:
-            # Simplifier le message pour le contexte
             simplified_msg = {
                 "role": msg.get("role", "user"),
                 "content": msg.get("content", ""),
@@ -165,12 +132,10 @@ async def get_conversation_history(discussion_id: str, limit: int = 10) -> List[
             }
             messages.append(simplified_msg)
         
-        # Inverser pour avoir les plus anciens en premier
         messages.reverse()
         return messages
     
     except InvalidId:
-        print("hello")
         raise ValueError(f"Invalid ObjectId format for discussion_id: {discussion_id}")
     except Exception as e:
         raise ValueError(f"Error fetching conversation history: {str(e)}")

@@ -41,17 +41,8 @@ rag_chain = RetrievalQA.from_chain_type(
     chain_type_kwargs={"prompt": custom_prompt}
 )
 
-""" query = input("Posez votre question juridique sur les Junior Entreprises : ")
-result = rag_chain.invoke({"query": query})
-
-print("Réponse :", result["result"])
-for doc in result["source_documents"]:
-    print(f"Source: {doc.metadata.get('source')}, page: {doc.metadata.get('page')}") """
-
 def format_conversation_history(messages: List[Dict[str, Any]]) -> str:
-    """
-    Formate l'historique de conversation pour le prompt
-    """
+    """Formate l'historique de conversation"""
     if not messages:
         return "Aucun historique de conversation."
     
@@ -68,14 +59,11 @@ def format_conversation_history(messages: List[Dict[str, Any]]) -> str:
     return "\n".join(formatted_history)
 
 def generate_answer(query: str, conversation_history: List[Dict[str, Any]] = None) -> Tuple[str, List[Tuple[str, str]]]:
-    """
-    Génère une réponse en prenant en compte l'historique de conversation
-    """
+    """Génère une réponse avec historique"""
     if conversation_history is None:
         conversation_history = []
 
     formatted_history = format_conversation_history(conversation_history)
-    
     context_docs = retriever.get_relevant_documents(query)
     context = "\n".join([doc.page_content for doc in context_docs])
     
@@ -87,8 +75,6 @@ def generate_answer(query: str, conversation_history: List[Dict[str, Any]] = Non
     
     response = llm.invoke(full_prompt)
     answer = response.content if hasattr(response, 'content') else str(response)
-    
     sources = [(doc.metadata.get('source'), doc.metadata.get('page')) for doc in context_docs]
     
-    print(f"Réponse : {answer}")
     return answer, sources
