@@ -38,6 +38,12 @@ COPY app/ ./
 COPY rag/ ./rag/
 
 # ================================
+# 📚 COPY DATA FILES EXPLICITLY
+# ================================
+# Force copy of data files even if in .gitignore
+COPY rag/data/ ./rag/data/
+
+# ================================
 # ⚙️ ENVIRONMENT SETUP
 # ================================
 ENV PYTHONPATH=/app
