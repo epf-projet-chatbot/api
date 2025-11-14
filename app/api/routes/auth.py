@@ -127,3 +127,34 @@ async def read_users_me(current_user: dict = Depends(get_current_user)):
         id=current_user["_id"],
         created_at=current_user.get("created_at")
     )
+
+
+@router.put("/me/password", status_code=status.HTTP_200_OK)
+async def change_user_password(
+    password_data: dict,
+    current_user: dict = Depends(get_current_user),
+    user_repo: UserRepository = Depends(get_user_repository)
+):
+    """Changer le mot de passe de l'utilisateur connecté"""
+    from api.services.user_service import UserService
+    
+    if "current_password" not in password_data or "new_password" not in password_data:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="current_password and new_password are required"
+        )
+    
+    if password_data["current_password"] == password_data["new_password"]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="New password must be different from current password"
+        )
+
+    user_service = UserService(user_repo)
+    await user_service.change_password(
+        user_id=current_user["_id"],
+        current_password=password_data["current_password"],
+        new_password=password_data["new_password"]
+    )
+    
+    return {"message": "Password updated successfully"}

@@ -120,3 +120,38 @@ class UserService:
             created_at=user.created_at,
             updated_at=user.updated_at
         )
+    
+    async def change_password(
+        self,
+        user_id: str,
+        current_password: str,
+        new_password: str
+    ) -> bool:
+        """
+        Changer le mot de passe d'un utilisateur
+        Vérifie d'abord que le mot de passe actuel est correct
+        """
+        user = await self.user_repo.get_user_by_id(user_id)
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User not found"
+            )
+
+        if not verify_password(current_password, user.hashed_password):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Current password is incorrect"
+            )
+
+
+        user_update = UserUpdate(password=new_password)
+        updated_user = await self.user_repo.update_user(user_id, user_update)
+        
+        if not updated_user:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to update password"
+            )
+        
+        return True

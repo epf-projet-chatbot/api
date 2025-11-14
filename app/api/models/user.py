@@ -53,6 +53,17 @@ class UserUpdate(BaseModel):
     admin: Optional[bool] = None
 
 
+class UserProfileUpdate(BaseModel):
+    """Schéma pour la mise à jour du profil utilisateur"""
+    name: Optional[str] = Field(None, min_length=1, max_length=100, description="Nom complet de l'utilisateur")
+
+
+class PasswordChangeRequest(BaseModel):
+    """Schéma pour la demande de changement de mot de passe"""
+    current_password: str = Field(..., min_length=6, description="Mot de passe actuel")
+    new_password: str = Field(..., min_length=8, description="Nouveau mot de passe (minimum 8 caractères)")
+
+
 class UserInDB(UserBase):
     """Schéma pour un utilisateur en base de données"""
     id: PyObjectId = Field(default_factory=PyObjectId, alias="_id")
