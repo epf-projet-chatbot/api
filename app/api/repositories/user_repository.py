@@ -27,6 +27,7 @@ class UserRepository:
             "hashed_password": get_password_hash(user_data.password),
             "is_active": user_data.is_active,
             "role": user_data.role,
+            "admin": user_data.admin,
             "created_at": datetime.utcnow()
         }
         
@@ -60,6 +61,8 @@ class UserRepository:
             update_data["is_active"] = user_data.is_active
         if user_data.role is not None:
             update_data["role"] = user_data.role
+        if user_data.admin is not None:
+            update_data["admin"] = user_data.admin
             
         if update_data:
             update_data["updated_at"] = datetime.utcnow()

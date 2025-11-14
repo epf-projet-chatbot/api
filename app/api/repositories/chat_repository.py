@@ -39,7 +39,7 @@ class ChatRepository:
     async def get_chats_by_user_id(self, user_id: str) -> List[dict]:
         """Récupérer toutes les discussions d'un utilisateur"""
         chats = []
-        async for chat in self.collection.find({"user_id": ObjectId(user_id)}):
+        async for chat in self.collection.find({"user_id": user_id}):
             # Uniformiser : convertir l'ObjectId en string
             chat["_id"] = str(chat["_id"])
             chats.append(chat)

@@ -6,22 +6,13 @@ from fastapi.security import OAuth2PasswordRequestForm
 from api.models.user import UserCreate, UserResponse, Token
 from api.services.auth_service import AuthService
 from api.repositories.user_repository import UserRepository
-from core.database import get_database
-from core.security import get_current_active_user
 from core.config import settings
 
 
+from core.dependencies import get_auth_service, get_user_repository, get_current_user
+
+
 router = APIRouter(prefix="/auth", tags=["Authentication"])
-
-
-def get_user_repository(db=Depends(get_database)) -> UserRepository:
-    """Dépendance pour obtenir le repository utilisateur"""
-    return UserRepository(db)
-
-
-def get_auth_service(user_repo: UserRepository = Depends(get_user_repository)) -> AuthService:
-    """Dépendance pour obtenir le service d'authentification"""
-    return AuthService(user_repo)
 
 
 @router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
@@ -44,7 +35,8 @@ async def register(
 async def login(
     response: Response,
     form_data: OAuth2PasswordRequestForm = Depends(),
-    auth_service: AuthService = Depends(get_auth_service)
+    auth_service: AuthService = Depends(get_auth_service),
+    user_repo: UserRepository = Depends(get_user_repository)
 ):
     """Connexion utilisateur avec cookie httpOnly"""    
     try:
@@ -52,7 +44,6 @@ async def login(
         token_data = await auth_service.authenticate_user(form_data.username, form_data.password)
         
         # Récupérer les infos utilisateur pour la réponse
-        user_repo = UserRepository(get_database())
         user = await user_repo.get_user_by_email(form_data.username)
         
         if not user:
@@ -78,6 +69,7 @@ async def login(
             "user": {
                 "email": user.email,
                 "role": user.role,
+                "admin": user.admin,
                 "id": str(user.id),
                 "is_active": user.is_active
             }
@@ -125,12 +117,13 @@ async def logout(response: Response):
 
 
 @router.get("/me", response_model=UserResponse)
-async def read_users_me(current_user: dict = Depends(get_current_active_user)):
+async def read_users_me(current_user: dict = Depends(get_current_user)):
     """Récupérer les informations de l'utilisateur connecté"""
     return UserResponse(
         email=current_user["email"],
         is_active=current_user.get("is_active", True),
         role=current_user.get("role", "user"),
+        admin=current_user.get("admin", False),
         id=current_user["_id"],
         created_at=current_user.get("created_at")
     )

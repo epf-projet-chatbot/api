@@ -36,6 +36,7 @@ class UserBase(BaseModel):
     email: EmailStr
     is_active: bool = True
     role: str = "user"
+    admin: bool = False
 
 
 class UserCreate(UserBase):
@@ -49,6 +50,7 @@ class UserUpdate(BaseModel):
     password: Optional[str] = Field(None, min_length=6)
     is_active: Optional[bool] = None
     role: Optional[str] = None
+    admin: Optional[bool] = None
 
 
 class UserInDB(UserBase):
