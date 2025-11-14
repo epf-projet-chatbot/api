@@ -74,11 +74,13 @@ class BotQuery(BaseModel):
 class BotQueryWithHistory(BaseModel):
     query: str = Field(..., description="Question à poser au chatbot")
     history_limit: Optional[int] = Field(10, description="Nombre de messages d'historique à inclure (défaut: 10, max: 50)")
+    system_prompt: Optional[str] = Field(None, description="Instructions système personnalisées pour modifier le comportement du chatbot (ton, style, langue)")
     
     class Config:
         json_schema_extra = {
             "example": {
                 "query": "Quelles sont les obligations d'une Junior Entreprise ?",
-                "history_limit": 15
+                "history_limit": 15,
+                "system_prompt": "Adopte un ton professionnel et formel. Fournis des réponses détaillées et complètes."
             }
         }

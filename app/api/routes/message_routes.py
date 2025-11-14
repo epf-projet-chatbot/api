@@ -5,7 +5,7 @@ from bson.errors import InvalidId
 
 from rag.answer import generate_answer
 from api.services.message_service import MessageService
-from api.schemas.message_schemas import MessageCreate, BotQuery
+from api.schemas.message_schemas import MessageCreate, BotQuery, BotQueryWithHistory
 from core.dependencies import get_message_service
 from core.config import settings
 
@@ -49,19 +49,21 @@ async def create_messages(
 @router.post("/{discussion_id}/chatbot", response_model=None)
 async def create_bot_message(
     discussion_id: str, 
-    payload: BotQuery,
+    payload: BotQueryWithHistory,
     message_service: MessageService = Depends(get_message_service)
 ):
     """Créer un message bot avec réponse RAG"""
     query = payload.query
+    system_prompt = payload.system_prompt
+    history_limit = payload.history_limit or 10
+    
     if not discussion_id or not query:
         raise HTTPException(status_code=400, detail="L'ID de la discussion et le contenu sont requis")
 
     # Récupérer l'historique via le service
-    conversation_history = await message_service.get_conversation_history(discussion_id, limit=10)
+    conversation_history = await message_service.get_conversation_history(discussion_id, limit=history_limit)
     
-    # Générer la réponse avec RAG
-    response, sources, template_path = generate_answer(query, conversation_history)
+    response, sources, template_path = generate_answer(query, conversation_history, system_prompt)
     
     # Préparer les pièces jointes si un template est détecté
     attachments = []

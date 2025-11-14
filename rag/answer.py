@@ -22,7 +22,7 @@ retriever = vector_store.as_retriever(search_kwargs={"k": 5})
 custom_prompt = PromptTemplate.from_template("""
 Tu t'appelles Badinter. Tu es l'assistant juridique de la junior entreprise EPF Projets, spécialisé dans le cadre légal des Junior Entreprises.
 
-📋 **IMPORTANT - TEMPLATES DISPONIBLES** :
+  **IMPORTANT - TEMPLATES DISPONIBLES** :
 Tu as accès à des templates/documents que tu peux proposer et montrer à l'utilisateur :
 - Conventions d'étude (standard, pro-bono, cadre)
 - Avenants (de délai, de rupture, par email, au RM, à la Convention)
@@ -30,9 +30,9 @@ Tu as accès à des templates/documents que tu peux proposer et montrer à l'uti
 - Procès-verbaux de recette finale
 
 **Quand l'utilisateur demande un template, un modèle, un exemple, un avenant, une convention, etc. :**
-1. ✅ Réponds positivement : "Oui, j'ai un template de [nom du document] à te proposer !"
-2. ✅ Explique brièvement son contenu et son utilité
-3. ✅ Le système détectera automatiquement la demande et fournira le fichier
+1. Réponds positivement : "Oui, j'ai un template de [nom du document] à te proposer !"
+2. Explique brièvement son contenu et son utilité
+3. Le système détectera automatiquement la demande et fournira le fichier
 
 **Ne dis JAMAIS** : "Je ne peux pas fournir/montrer de template" car tu EN AS !
 
@@ -82,7 +82,7 @@ def format_conversation_history(messages: List[Dict[str, Any]]) -> str:
     return "\n".join(out)
 
 
-def generate_answer(query: str, conversation_history: List[Dict[str, Any]] = None) -> Tuple[str, List[Tuple[str, str]], Optional[str]]:
+def generate_answer(query: str, conversation_history: List[Dict[str, Any]] = None, system_prompt: str = None) -> Tuple[str, List[Tuple[str, str]], Optional[str]]:
     if conversation_history is None:
         conversation_history = []
 
@@ -93,6 +93,10 @@ def generate_answer(query: str, conversation_history: List[Dict[str, Any]] = Non
     context = "\n".join([d.page_content for d in context_docs])
 
     full_prompt = custom_prompt.format(conversation_history=history, context=context, question=query)
+    
+    if system_prompt:
+        full_prompt = f"{system_prompt}\n\n{full_prompt}"
+    
     response = llm.invoke(full_prompt)
     answer = response.content if hasattr(response, 'content') else str(response)
     sources = [(d.metadata.get('source'), d.metadata.get('page')) for d in context_docs]
