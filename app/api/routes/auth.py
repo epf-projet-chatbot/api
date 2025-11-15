@@ -210,3 +210,31 @@ async def update_user_profile(
         "message": "Profile updated successfully",
         "name": name
     }
+
+
+@router.delete("/me", status_code=status.HTTP_200_OK)
+async def delete_my_account(
+    response: Response,
+    current_user: dict = Depends(get_current_user),
+    user_repo: UserRepository = Depends(get_user_repository)
+):
+    """Supprimer le compte de l'utilisateur connecté"""
+    from api.services.user_service import UserService
+    
+    user_service = UserService(user_repo)
+    success = await user_service.delete_user(current_user["_id"])
+    
+    if not success:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to delete account"
+        )
+
+    response.delete_cookie(
+        key="access_token",
+        httponly=True,
+        secure=False,
+        samesite="lax"
+    )
+    
+    return {"message": "Account deleted successfully"}
