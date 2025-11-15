@@ -123,6 +123,52 @@ async def add_correction_to_chroma(
     except Exception as e:
         raise Exception(f"Erreur lors de l'ajout de la correction: {e}")
 
+
+def get_all_corrections() -> list[dict]:
+    """
+    Récupère toutes les corrections admin depuis ChromaDB
+    """
+    try:
+        db = Chroma(persist_directory=CHROMA_PATH, embedding_function=embeddings)
+        
+        all_data = db.get(
+            where={"type": "admin_correction"}
+        )
+        
+        corrections = []
+        if all_data and 'ids' in all_data:
+            for i, doc_id in enumerate(all_data['ids']):
+                metadata = all_data['metadatas'][i] if 'metadatas' in all_data and i < len(all_data['metadatas']) else {}
+                content = all_data['documents'][i] if 'documents' in all_data and i < len(all_data['documents']) else ""
+                
+                corrections.append({
+                    "id": doc_id,
+                    "content": content,
+                    "admin_id": metadata.get("admin_id", "unknown"),
+                    "discussion_id": metadata.get("discussion_id", ""),
+                    "context_question": metadata.get("context_question", ""),
+                    "created_at": metadata.get("created_at", ""),
+                    "priority": metadata.get("priority", "high")
+                })
+        
+        return sorted(corrections, key=lambda x: x.get("created_at", ""), reverse=True)
+        
+    except Exception as e:
+        raise Exception(f"Erreur lors de la récupération des corrections: {e}")
+
+
+def delete_correction_from_chroma(correction_id: str) -> bool:
+    """
+    Supprime une correction de ChromaDB
+    """
+    try:
+        db = Chroma(persist_directory=CHROMA_PATH, embedding_function=embeddings)
+        db.delete(ids=[correction_id])
+        return True
+        
+    except Exception as e:
+        raise Exception(f"Erreur lors de la suppression de la correction: {e}")
+
 if __name__ == "__main__":
     # Import seulement pour l'embedding initial
     from loader import process_documents

@@ -109,3 +109,19 @@ class UserRepository:
         if not verify_password(password, user.hashed_password):
             return None
         return user
+    
+    async def get_all_users(self) -> List[UserInDB]:
+        """Récupérer tous les utilisateurs"""
+        cursor = self.collection.find().sort("created_at", -1)
+        users = []
+        async for user_doc in cursor:
+            users.append(UserInDB(**user_doc))
+        return users
+    
+    async def update_user_role(self, user_id: str, role: str) -> Optional[UserInDB]:
+        """Mettre à jour le rôle d'un utilisateur"""
+        return await self.update_user(user_id, update_data={"role": role})
+    
+    async def count_users(self) -> int:
+        """Compter le nombre total d'utilisateurs"""
+        return await self.collection.count_documents({})

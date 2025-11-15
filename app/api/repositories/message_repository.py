@@ -187,4 +187,8 @@ class MessageRepository:
 
         except Exception as e:
             return {"error": str(e)}
+    
+    async def count_messages(self) -> int:
+        """Compter le nombre total de messages"""
+        return await self.collection.count_documents({})
 

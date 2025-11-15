@@ -12,6 +12,7 @@ from core.security import get_current_active_user
 
 from api.routes import auth_router, chat_router, message_router, upload_router
 from api.routes.template_routes import router as template_router
+from api.routes.admin_routes import router as admin_router
 
 # Configuration du logging
 logging.basicConfig(level=logging.INFO)
@@ -52,9 +53,10 @@ app = FastAPI(
 )
 
 # Configuration CORS
+cors_origins = settings.cors_origins_list + ["http://localhost:3000", "http://localhost:3001", "http://localhost:3002"]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.cors_origins_list,
+    allow_origins=cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -66,6 +68,7 @@ app.include_router(chat_router)
 app.include_router(message_router)
 app.include_router(upload_router)
 app.include_router(template_router)
+app.include_router(admin_router)
 
 # Routes de base
 @app.get("/", tags=["Root"])
