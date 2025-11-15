@@ -34,6 +34,7 @@ class PyObjectId(ObjectId):
 class UserBase(BaseModel):
     """Schéma de base pour un utilisateur"""
     email: EmailStr
+    name: Optional[str] = Field(None, max_length=100, description="Nom complet de l'utilisateur (prénom + nom)")
     is_active: bool = True
     role: str = "user"
     admin: bool = False

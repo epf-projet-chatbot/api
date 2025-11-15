@@ -60,7 +60,7 @@ class UserService:
             if email_exists:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Email already registered"
+                    detail="Email déjà existant"
                 )
         
         updated_user = await self.user_repo.update_user(user_id, user_data)

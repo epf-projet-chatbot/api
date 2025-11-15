@@ -24,6 +24,7 @@ async def register(
     user = await auth_service.register_user(user_data)
     return UserResponse(
         email=user.email,
+        name=user.name,
         is_active=user.is_active,
         role=user.role,
         id=str(user.id),
@@ -68,6 +69,7 @@ async def login(
             "message": "Connexion réussie",
             "user": {
                 "email": user.email,
+                "name": user.name,
                 "role": user.role,
                 "admin": user.admin,
                 "id": str(user.id),
@@ -121,6 +123,7 @@ async def read_users_me(current_user: dict = Depends(get_current_user)):
     """Récupérer les informations de l'utilisateur connecté"""
     return UserResponse(
         email=current_user["email"],
+        name=current_user.get("name"),
         is_active=current_user.get("is_active", True),
         role=current_user.get("role", "user"),
         admin=current_user.get("admin", False),
@@ -158,3 +161,49 @@ async def change_user_password(
     )
     
     return {"message": "Password updated successfully"}
+
+
+@router.patch("/me/profile", status_code=status.HTTP_200_OK)
+async def update_user_profile(
+    profile_data: dict,
+    current_user: dict = Depends(get_current_user),
+    user_repo: UserRepository = Depends(get_user_repository)
+):
+    """Mettre à jour le profil de l'utilisateur connecté (nom complet)"""
+    from api.models.user import UserProfileUpdate
+    
+    if "name" not in profile_data:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="name field is required"
+        )
+    
+    name = profile_data["name"].strip()
+    if not name or len(name) < 1:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Name must not be empty"
+        )
+    
+    if len(name) > 100:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Name must not exceed 100 characters"
+        )
+    
+    # Mettre à jour le nom dans la base de données
+    updated_user = await user_repo.update_user(
+        user_id=current_user["_id"],
+        update_data={"name": name}
+    )
+    
+    if not updated_user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+    
+    return {
+        "message": "Profile updated successfully",
+        "name": name
+    }
