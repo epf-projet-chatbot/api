@@ -28,10 +28,6 @@ class MessageService:
     ) -> str:
         """
         Créer un nouveau message
-        Logique métier:
-        - Vérifier que le chat existe
-        - Convertir les attachments en format DB
-        - Mettre à jour le titre du chat si c'est le premier message utilisateur
         """
         # cehck if data exist
         chat = await self.chat_repo.get_chat_by_id(message_data.discussion_id)
@@ -151,3 +147,20 @@ class MessageService:
                 detail=f"Message with id {message_id} not found"
             )
         return True
+    
+    async def handle_admin_correction(
+        self, 
+        user_id: str, 
+        message_content: str, 
+        discussion_id: str
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Gère les commandes /correction des admins
+        Retourne None si ce n'est pas une commande de correction
+        """
+        result = await self.message_repo.system_correction_chatbot(
+            user_id=user_id,
+            message=message_content,
+            discussion_id=discussion_id
+        )
+        return result

@@ -2,6 +2,7 @@ from langchain.prompts import PromptTemplate
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_chroma import Chroma
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
+from langchain_core.documents import Document
 from typing import List, Dict, Any, Tuple, Optional
 import os
 import re
@@ -22,7 +23,15 @@ retriever = vector_store.as_retriever(search_kwargs={"k": 5})
 custom_prompt = PromptTemplate.from_template("""
 Tu t'appelles Badinter. Tu es l'assistant juridique de la junior entreprise EPF Projets, spécialisé dans le cadre légal des Junior Entreprises.
 
-  **IMPORTANT - TEMPLATES DISPONIBLES** :
+** CORRECTIONS PRIORITAIRES **
+Si le contexte contient des "CORRECTIONS PRIORITAIRES", tu DOIS les utiliser EN PRIORITÉ dans ta réponse.
+Ces corrections ont été validées par des administrateurs et remplacent toute autre information contradictoire.
+
+**IMPORTANT** : Quand tu utilises une correction prioritaire dans ta réponse, tu DOIS l'indiquer clairement en ajoutant à la fin de ta réponse :
+
+> ℹ️ **Note** : Cette réponse inclut une correction validée par un administrateur.
+
+**IMPORTANT - TEMPLATES DISPONIBLES** :
 Tu as accès à des templates/documents que tu peux proposer et montrer à l'utilisateur :
 - Conventions d'étude (standard, pro-bono, cadre)
 - Avenants (de délai, de rupture, par email, au RM, à la Convention)
@@ -88,9 +97,27 @@ def generate_answer(query: str, conversation_history: List[Dict[str, Any]] = Non
 
     history = format_conversation_history(conversation_history)
     
-    # Chercher dans TOUS les documents (pas de filtrage)
+    admin_corrections = []
+    try:
+        admin_corrections = vector_store.similarity_search(
+            query,
+            k=3, 
+            filter={"$and": [{"type": {"$eq": "admin_correction"}}, {"priority": {"$eq": "high"}}]}
+        )
+    except Exception as e:
+        print(f"Erreur lors de la recherche des corrections: {e}")
+        admin_corrections = []
+    
     context_docs = retriever.get_relevant_documents(query)
-    context = "\n".join([d.page_content for d in context_docs])
+    
+    context_parts = []
+    if admin_corrections:
+        context_parts.append("=== CORRECTIONS PRIORITAIRES (À UTILISER EN PREMIER) ===")
+        context_parts.extend([d.page_content for d in admin_corrections])
+        context_parts.append("\n=== DOCUMENTATION STANDARD ===")
+    
+    context_parts.extend([d.page_content for d in context_docs])
+    context = "\n".join(context_parts)
 
     full_prompt = custom_prompt.format(conversation_history=history, context=context, question=query)
     

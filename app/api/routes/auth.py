@@ -27,7 +27,8 @@ async def register(
         name=user.name,
         is_active=user.is_active,
         role=user.role,
-        id=str(user.id),
+        admin=user.admin,
+        _id=str(user.id),
         created_at=user.created_at
     )
 
@@ -96,9 +97,11 @@ async def get_all_users(
     return [
         UserResponse(
             email=user.email,
+            name=user.name,
             is_active=user.is_active,
             role=user.role,
-            id=str(user.id),
+            admin=user.admin,
+            _id=str(user.id),
             created_at=user.created_at,
             updated_at=user.updated_at
         )
@@ -127,7 +130,7 @@ async def read_users_me(current_user: dict = Depends(get_current_user)):
         is_active=current_user.get("is_active", True),
         role=current_user.get("role", "user"),
         admin=current_user.get("admin", False),
-        id=current_user["_id"],
+        _id=str(current_user["_id"]),
         created_at=current_user.get("created_at")
     )
 

@@ -1,4 +1,3 @@
-from loader import process_documents
 from langchain_chroma import Chroma
 from langchain_core.documents import Document
 import getpass
@@ -81,7 +80,53 @@ def add_to_chroma(chunks: list[Document]):
     except Exception as e:
         raise Exception(f"Erreur Chroma: {e}")
 
+
+async def add_correction_to_chroma(
+    correction_text: str,
+    context_question: str = "",
+    admin_id: str = "",
+    discussion_id: str = ""
+) -> str:
+    """
+    ajoute une correction admin dans ChromaDB avec métadonnées prioritaires
+    """
+    try:
+        from datetime import datetime
+        
+        db = Chroma(persist_directory=CHROMA_PATH, embedding_function=embeddings)
+        
+        timestamp = datetime.now().isoformat()
+        correction_id = f"correction_{admin_id}_{discussion_id}_{timestamp}"
+        
+        full_content = f"CORRECTION PRIORITAIRE:\n{correction_text}"
+        if context_question:
+            full_content = f"Question: {context_question}\n\n{full_content}"
+        
+        correction_doc = Document(
+            page_content=full_content,
+            metadata={
+                "id": correction_id,
+                "type": "admin_correction",
+                "priority": "high", 
+                "admin_id": admin_id,
+                "discussion_id": discussion_id,
+                "context_question": context_question,
+                "created_at": timestamp,
+                "source": "admin_correction"
+            }
+        )
+        
+        db.add_documents([correction_doc], ids=[correction_id])
+
+        return correction_id
+        
+    except Exception as e:
+        raise Exception(f"Erreur lors de l'ajout de la correction: {e}")
+
 if __name__ == "__main__":
+    # Import seulement pour l'embedding initial
+    from loader import process_documents
+    
     print("🔍 Starting embedding process...")
     print("⏳ Waiting for API to be ready...")
     wait_for_api("http://api:8000/api/health")

@@ -56,16 +56,36 @@ async def create_bot_message(
     query = payload.query
     system_prompt = payload.system_prompt
     history_limit = payload.history_limit or 10
+    user_id = payload.user_id 
+
     
     if not discussion_id or not query:
         raise HTTPException(status_code=400, detail="L'ID de la discussion et le contenu sont requis")
 
-    # Récupérer l'historique via le service
+    if user_id:
+        correction_result = await message_service.handle_admin_correction(
+            user_id=user_id,
+            message_content=query,
+            discussion_id=discussion_id
+        )
+        
+        
+        if correction_result:
+            if "error" in correction_result:
+                raise HTTPException(status_code=403, detail=correction_result["error"])
+
+            return {
+                "message_id": None,
+                "response": f"{correction_result['message']}\n\nCorrection ajoutée : {correction_result['correction']}",
+                "sources": [],
+                "used_history": False,
+                "is_correction": True
+            }
+
     conversation_history = await message_service.get_conversation_history(discussion_id, limit=history_limit)
     
     response, sources, template_path = generate_answer(query, conversation_history, system_prompt)
-    
-    # Préparer les pièces jointes si un template est détecté
+
     attachments = []
     if template_path:
         import os

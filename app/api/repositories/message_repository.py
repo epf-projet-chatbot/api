@@ -3,6 +3,7 @@ Repository pour la gestion des messages en base de données
 """
 from typing import List, Optional, Dict, Any
 from datetime import datetime
+import re
 from bson import ObjectId
 from bson.errors import InvalidId
 from motor.motor_asyncio import AsyncIOMotorDatabase
@@ -14,6 +15,7 @@ class MessageRepository:
     def __init__(self, database: AsyncIOMotorDatabase):
         self.database = database
         self.collection = database.messages
+        self.collection_user = database.users
     
     async def create(
         self, 
@@ -142,3 +144,47 @@ class MessageRepository:
             return messages
         except InvalidId:
             return []
+        
+    async def system_correction_chatbot(self, user_id: str, message: str, discussion_id: str):
+        """Si l'utilisateur est un admin et fait /correction, ajoute la correction dans ChromaDB"""
+        try:
+            match = re.match(r'^/correction\s+(.+)$', message, re.IGNORECASE)
+            if not match:
+                return None 
+            correction = match.group(1)
+
+            user = await self.collection_user.find_one(
+                {"_id": ObjectId(user_id)},
+                {"admin": 1, "_id": 0}
+            )
+
+            user_admin = user.get("admin", False) if user else False
+            if not user_admin:
+                return {"error": "Accès refusé : vous devez être admin"}
+            
+            recent_messages = await self.get_conversation_history(discussion_id, limit=5)
+            context_question = ""
+            if recent_messages:
+                for msg in reversed(recent_messages):
+                    if msg.get("role") == "user" and not msg.get("content", "").startswith("/"):
+                        context_question = msg.get("content", "")
+                        break
+            
+            from rag.embedding import add_correction_to_chroma
+            correction_id = await add_correction_to_chroma(
+                correction_text=correction,
+                context_question=context_question,
+                admin_id=user_id,
+                discussion_id=discussion_id
+            )
+            
+            return {
+                "success": True,
+                "correction": correction,
+                "correction_id": correction_id,
+                "message": "Correction ajoutée avec succès et sera prioritaire dans les futures réponses"
+            }
+
+        except Exception as e:
+            return {"error": str(e)}
+
