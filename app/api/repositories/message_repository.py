@@ -158,8 +158,11 @@ class MessageRepository:
                 {"admin": 1, "_id": 0}
             )
 
-            user_admin = user.get("admin", False) if user else False
+            user_admin = user.get("admin", "user") if user else "user"
+            
             if not user_admin:
+                return {"error": "Accès refusé : vous devez être admin"}
+            if (user_admin !="admin" and user_admin != "superadmin"):
                 return {"error": "Accès refusé : vous devez être admin"}
             
             recent_messages = await self.get_conversation_history(discussion_id, limit=5)

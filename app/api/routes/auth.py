@@ -129,7 +129,7 @@ async def read_users_me(current_user: dict = Depends(get_current_user)):
         name=current_user.get("name"),
         is_active=current_user.get("is_active", True),
         role=current_user.get("role", "user"),
-        admin=current_user.get("admin", False),
+        admin=current_user.get("admin", "user"),
         _id=str(current_user["_id"]),
         created_at=current_user.get("created_at")
     )

@@ -72,7 +72,13 @@ async def create_bot_message(
         
         if correction_result:
             if "error" in correction_result:
-                raise HTTPException(status_code=403, detail=correction_result["error"])
+                return {
+                    "message_id": None,
+                    "response": "Vous n'êtes pas autorisé à utiliser cette commande. \nSi vous pensez que c'est une erreur, veuillez contacter un administrateur",
+                    "sources": [],
+                    "used_history": False,
+                    "is_correction": True
+                }
 
             return {
                 "message_id": None,

@@ -37,7 +37,7 @@ class UserBase(BaseModel):
     name: Optional[str] = Field(None, max_length=100, description="Nom complet de l'utilisateur (prénom + nom)")
     is_active: bool = True
     role: str = "user"
-    admin: bool = False
+    admin: str = "user"
 
 
 class UserCreate(UserBase):
@@ -51,7 +51,7 @@ class UserUpdate(BaseModel):
     password: Optional[str] = Field(None, min_length=6)
     is_active: Optional[bool] = None
     role: Optional[str] = None
-    admin: Optional[bool] = None
+    admin: Optional[str] = "user"
 
 
 class UserProfileUpdate(BaseModel):

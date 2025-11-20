@@ -11,7 +11,7 @@ from rag.embedding import get_all_corrections, delete_correction_from_chroma
 router = APIRouter(prefix="/admin", tags=["admin"])
 
 async def verify_admin(current_user: dict = Depends(get_current_user)) -> dict:
-    if not current_user.get("admin", False):
+    if not current_user.get("superadmin", "user"):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Accès réservé aux administrateurs"
@@ -30,6 +30,7 @@ async def get_all_users(
         "email": user.email,
         "name": user.name,
         "role": user.role,
+        "admin": user.admin,
         "created_at": user.created_at.isoformat() if user.created_at else None,
         "is_active": user.is_active
     } for user in users]
