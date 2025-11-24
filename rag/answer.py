@@ -1,51 +1,157 @@
 from langchain.prompts import PromptTemplate
-from langchain.chains import RetrievalQA
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_chroma import Chroma
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
+from langchain_core.documents import Document
+from typing import List, Dict, Any, Tuple, Optional
 import os
+import re
 from dotenv import load_dotenv
+
+from .templates import AVAILABLE_TEMPLATES, data_complete_path, get_template_path
+from .detector import detect_template_with_ai
+
 load_dotenv()
 
 llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash", temperature=0.2, google_api_key=os.getenv("GOOGLE_API_KEY"))
-
 embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
 
-# Chemin de la base de données Chroma adapté pour Docker et développement local
-chroma_db_path = os.path.join(os.path.dirname(__file__), "chroma_db")
-
+chroma_db_path = os.getenv("CHROMA_PATH", os.path.join(os.path.dirname(__file__), "chroma_db"))
 vector_store = Chroma(persist_directory=chroma_db_path, embedding_function=embeddings)
 retriever = vector_store.as_retriever(search_kwargs={"k": 5})
 
 custom_prompt = PromptTemplate.from_template("""
-Tu t'appelles Badinter. Tu es un assistant juridique spécialisé dans le cadre légal des Junior Entreprises françaises. Utilise les informations suivantes pour répondre à la question de manière factuelle et concise. Ne mentionne pas ce que je viens de te dire et n'utilise pas de caractères comme des * dans ta réponse.
+Tu t'appelles Badinter. Tu es l'assistant juridique de la junior entreprise EPF Projets, spécialisé dans le cadre légal des Junior Entreprises.
 
-Contexte :
-{context}
+** CORRECTIONS PRIORITAIRES **
+Si le contexte contient des "CORRECTIONS PRIORITAIRES", tu DOIS les utiliser EN PRIORITÉ dans ta réponse.
+Ces corrections ont été validées par des administrateurs et remplacent toute autre information contradictoire.
 
-Question :
-{question}
+**IMPORTANT** : Quand tu utilises une correction prioritaire d'un administrateur et uniquement dans ce contexte la, dans ta réponse, tu DOIS l'indiquer clairement en ajoutant à la fin de ta réponse :
 
+> ℹ️ **Note** : Cette réponse inclut une correction validée par un administrateur.
+
+Dans le cas contraire tu n'ajoutes rien
+
+**IMPORTANT - TEMPLATES DISPONIBLES** :
+Tu as accès à des templates/documents que tu peux proposer et montrer à l'utilisateur :
+- Conventions d'étude (standard, pro-bono, cadre)
+- Avenants (de délai, de rupture, par email, au RM, à la Convention)
+- Bons de commande (standard, rectificatif)
+- Procès-verbaux de recette finale
+
+**Quand l'utilisateur demande un template, un modèle, un exemple, un avenant, une convention, un tutoriel etc. :**
+1. Réponds positivement : "Oui, j'ai un template de [nom du document] à te proposer !"
+2. Explique brièvement son contenu et son utilité
+3. Le système détectera automatiquement la demande et fournira le fichier
+
+**Ne dis JAMAIS** : "Je ne peux pas fournir/montrer de template" car tu EN AS !
+
+ **FORMAT DE RÉPONSE - MARKDOWN** :
+Structure TOUJOURS tes réponses en Markdown bien formaté :
+
+- Commence toujours par **un seul titre principal** avec `#` (niveau 1) pour la réponse globale.
+- Utilise **## Sous-titres** (niveau 2) pour les grandes sections logiques :
+  - ex : `## Définition`, `## Informations clés`, `## Procédure`, `## Risques et recommandations`.
+- Utilise **### Sous-sous-sections** (niveau 3) pour structurer l'intérieur d'une section :
+  - ex : sous `## Informations clés` → `### Rôle du document`, `### Enregistrement comptable`, `### Points de vigilance`.
+- Utilise des **listes à puces** (* ou -) pour énumérer des éléments.
+- Utilise des **listes numérotées** (1., 2., 3.) pour des étapes.
+- Utilise **`code`** pour les termes techniques ou noms de documents.
+- Utilise **gras** pour mettre en évidence des points importants.
+- Utilise des **> citations** pour les références légales ou extraits de textes officiels.
+- Saute des lignes entre les paragraphes pour l'aération.
+
+Exemple de structure :
+```markdown
+# Titre de la réponse
+
+Paragraphe introductif clair.
+
+## Section principale
+
+Paragraphe d'explication.
+
+### Sous-partie de la section
+
+* Premier élément
+* Deuxième élément
+* Troisième élément
+
+## Autre section importante
+
+**Important :** Information clé à retenir.
+```
+
+Réponds de façon factuelle, concise, structurée et proactive. Si le contexte contient l'information, utilise-la pour une réponse précise.
+
+Historique : {conversation_history}
+Contexte : {context}
+Question : {question}
 Réponse :
 """)
 
-rag_chain = RetrievalQA.from_chain_type(
-    llm=llm,
-    retriever=retriever,
-    return_source_documents=True,
-    chain_type_kwargs={"prompt": custom_prompt}
-)
+def format_conversation_history(messages: List[Dict[str, Any]]) -> str:
+    if not messages:
+        return ""
+    out = []
+    for m in messages:
+        role = m.get('role', 'user')
+        content = m.get('content', '')
+        out.append(("Utilisateur: " if role == 'user' else "Badinter: ") + content)
+    return "\n".join(out)
 
-""" query = input("Posez votre question juridique sur les Junior Entreprises : ")
-result = rag_chain.invoke({"query": query})
 
-print("Réponse :", result["result"])
-for doc in result["source_documents"]:
-    print(f"Source: {doc.metadata.get('source')}, page: {doc.metadata.get('page')}") """
+def generate_answer(query: str, conversation_history: List[Dict[str, Any]] = None, system_prompt: str = None) -> Tuple[str, List[Tuple[str, str]], Optional[str]]:
+    if conversation_history is None:
+        conversation_history = []
 
-def generate_answer(query):
-    result = rag_chain.invoke({"query": query})
-    answer = result["result"]
-    sources = [(doc.metadata.get('source'), doc.metadata.get('page')) for doc in result["source_documents"]]
-    print(f"Réponse : {answer}")
-    return answer, sources
+    history = format_conversation_history(conversation_history)
+    
+    admin_corrections = []
+    try:
+        results = vector_store.similarity_search_with_score(
+            query,
+            k=3,
+            filter={
+                "$and": [
+                    {"type": {"$eq": "admin_correction"}},
+                    {"priority": {"$eq": "high"}},
+                ]
+            },
+        )
+        admin_corrections = [ doc for doc, score in results if score <= 0.4 ]
+    except Exception as e:
+        print(f"Erreur lors de la recherche des corrections: {e}")
+        admin_corrections = []
+    
+    context_docs = retriever.get_relevant_documents(query)
+    
+    context_parts = []
+    if admin_corrections:
+        context_parts.append("=== CORRECTIONS PRIORITAIRES (À UTILISER EN PREMIER) ===")
+        context_parts.extend([d.page_content for d in admin_corrections])
+        context_parts.append("\n=== DOCUMENTATION STANDARD ===")
+    
+    context_parts.extend([d.page_content for d in context_docs])
+    context = "\n".join(context_parts)
+
+    full_prompt = custom_prompt.format(conversation_history=history, context=context, question=query)
+    
+    if system_prompt:
+        full_prompt = f"{system_prompt}\n\n{full_prompt}"
+    
+    response = llm.invoke(full_prompt)
+    answer = response.content if hasattr(response, 'content') else str(response)
+    sources = [(d.metadata.get('source'), d.metadata.get('page')) for d in context_docs]
+
+
+    # Détection du template demandé
+    requested_template = detect_template_with_ai(llm, query, AVAILABLE_TEMPLATES)
+    template_path = None
+    
+    if requested_template:
+        template_path = get_template_path(requested_template)
+
+    answer = re.sub(r"TEMPLATE_REQUEST:\s*.+?(?:\n|$)", "", answer, flags=re.IGNORECASE).strip()
+    return answer, sources, template_path

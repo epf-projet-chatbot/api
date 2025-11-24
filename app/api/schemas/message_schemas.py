@@ -70,3 +70,19 @@ class MessageResponse(BaseModel):
         
 class BotQuery(BaseModel):
     query: str
+
+class BotQueryWithHistory(BaseModel):
+    query: str = Field(..., description="Question à poser au chatbot")
+    history_limit: Optional[int] = Field(10, description="Nombre de messages d'historique à inclure (défaut: 10, max: 50)")
+    system_prompt: Optional[str] = Field(None, description="Instructions système personnalisées pour modifier le comportement du chatbot (ton, style, langue)")
+    user_id: Optional[str] = Field(None, description="ID de l'utilisateur (requis pour les commandes /correction admin)")
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "query": "Quelles sont les obligations d'une Junior Entreprise ?",
+                "history_limit": 15,
+                "system_prompt": "Adopte un ton professionnel et formel. Fournis des réponses détaillées et complètes.",
+                "user_id": "60d5ec49f8d2e4b8b4e7b8c1"
+            }
+        }

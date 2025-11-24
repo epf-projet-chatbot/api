@@ -38,6 +38,12 @@ COPY app/ ./
 COPY rag/ ./rag/
 
 # ================================
+# 📚 COPY DATA FILES EXPLICITLY
+# ================================
+# Force copy of data files even if in .gitignore
+COPY rag/data/ ./rag/data/
+
+# ================================
 # ⚙️ ENVIRONMENT SETUP
 # ================================
 ENV PYTHONPATH=/app
@@ -51,5 +57,4 @@ RUN mkdir -p /app/uploads
 # ================================
 EXPOSE 8000
 
-# Use uvicorn with proper configuration for production
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]

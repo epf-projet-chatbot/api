@@ -34,8 +34,10 @@ class PyObjectId(ObjectId):
 class UserBase(BaseModel):
     """Schéma de base pour un utilisateur"""
     email: EmailStr
+    name: Optional[str] = Field(None, max_length=100, description="Nom complet de l'utilisateur (prénom + nom)")
     is_active: bool = True
     role: str = "user"
+    admin: str = "user"
 
 
 class UserCreate(UserBase):
@@ -49,6 +51,18 @@ class UserUpdate(BaseModel):
     password: Optional[str] = Field(None, min_length=6)
     is_active: Optional[bool] = None
     role: Optional[str] = None
+    admin: Optional[str] = "user"
+
+
+class UserProfileUpdate(BaseModel):
+    """Schéma pour la mise à jour du profil utilisateur"""
+    name: Optional[str] = Field(None, min_length=1, max_length=100, description="Nom complet de l'utilisateur")
+
+
+class PasswordChangeRequest(BaseModel):
+    """Schéma pour la demande de changement de mot de passe"""
+    current_password: str = Field(..., min_length=6, description="Mot de passe actuel")
+    new_password: str = Field(..., min_length=8, description="Nouveau mot de passe (minimum 8 caractères)")
 
 
 class UserInDB(UserBase):

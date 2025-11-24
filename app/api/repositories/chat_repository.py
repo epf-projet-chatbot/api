@@ -39,7 +39,7 @@ class ChatRepository:
     async def get_chats_by_user_id(self, user_id: str) -> List[dict]:
         """Récupérer toutes les discussions d'un utilisateur"""
         chats = []
-        async for chat in self.collection.find({"user_id": ObjectId(user_id)}):
+        async for chat in self.collection.find({"user_id": user_id}):
             # Uniformiser : convertir l'ObjectId en string
             chat["_id"] = str(chat["_id"])
             chats.append(chat)
@@ -61,3 +61,15 @@ class ChatRepository:
         """Supprimer une discussion"""
         result = await self.collection.delete_one({"_id": ObjectId(chat_id)})
         return result.deleted_count > 0
+    
+    async def get_all_chats(self) -> List[dict]:
+        """Récupérer toutes les discussions"""
+        chats = []
+        async for chat in self.collection.find().sort("created_at", -1):
+            chat["_id"] = str(chat["_id"])
+            chats.append(chat)
+        return chats
+    
+    async def count_chats(self) -> int:
+        """Compter le nombre total de discussions"""
+        return await self.collection.count_documents({})

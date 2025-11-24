@@ -13,6 +13,11 @@ from fastapi.openapi.models import OAuthFlows as OAuthFlowsModel
 from .config import settings
 from .database import get_database
 from bson import ObjectId
+import hmac, hashlib, time
+import os
+
+SLACK_SIGNING_SECRET = os.environ["SLACK_SIGNING_SECRET"]
+
 
 
 class OAuth2PasswordBearerCookie(SecurityBase):
@@ -119,48 +124,38 @@ async def get_current_user(
     authorization = request.headers.get("Authorization")
     if authorization and authorization.startswith("Bearer "):
         token = authorization.split(" ")[1]
-        print(f"🔍 Token from header: {token[:20]}...")
     else:
         # Puis essayer le cookie
         cookie_token = request.cookies.get("access_token")
-        print(f"🔍 Cookie found: {cookie_token[:50] if cookie_token else 'None'}...")
         
         if cookie_token:
             # Nettoyer le cookie et l'utiliser directement (plus de "Bearer ")
             token = cookie_token.strip('"\'')
-            print(f"🔍 Token from cookie: {token[:20]}...")
     
     if not token:
-        print("🔍 No token found in header or cookie")
         raise credentials_exception
     
     # Vérifier le token
     user_id = verify_token(token)
-    print(f"🔍 Token verification result: {user_id}")
     
     if user_id is None:
-        print("🔍 Token verification failed")
         raise credentials_exception
     
     # Récupérer l'utilisateur depuis MongoDB
     try:
         # Le token contient l'ID utilisateur, pas l'email
         if not ObjectId.is_valid(user_id):
-            print(f"🔍 Invalid ObjectId: {user_id}")
             raise credentials_exception
             
         user = await db.users.find_one({"_id": ObjectId(user_id)})
         if user is None:
-            print(f"🔍 User not found for ID: {user_id}")
             raise credentials_exception
         
-        print(f"🔍 User found: {user['email']}")
         # Convertir ObjectId en string pour la sérialisation
         user["_id"] = str(user["_id"])
         return user
         
     except Exception as e:
-        print(f"🔍 Database error: {e}")
         raise credentials_exception
 
 
@@ -169,3 +164,23 @@ async def get_current_active_user(current_user: dict = Depends(get_current_user)
     if not current_user.get("is_active", True):
         raise HTTPException(status_code=400, detail="Inactive user")
     return current_user
+
+def verify_slack_signature(request: Request, body: bytes):
+    timestamp = request.headers.get("X-Slack-Request-Timestamp", "")
+    slack_sig = request.headers.get("X-Slack-Signature", "")
+
+    if not timestamp or not slack_sig:
+        raise HTTPException(status_code=400, detail="Missing Slack headers")
+
+    if abs(time.time() - int(timestamp)) > 60 * 5:
+        raise HTTPException(status_code=400, detail="Invalid timestamp")
+
+    sig_basestring = f"v0:{timestamp}:{body.decode('utf-8')}".encode('utf-8')
+    my_sig = "v0=" + hmac.new(
+        SLACK_SIGNING_SECRET.encode('utf-8'),
+        sig_basestring,
+        hashlib.sha256
+    ).hexdigest()
+
+    if not hmac.compare_digest(my_sig, slack_sig):
+        raise HTTPException(status_code=400, detail="Invalid signature")

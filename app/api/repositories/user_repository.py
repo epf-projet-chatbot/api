@@ -22,11 +22,15 @@ class UserRepository:
     
     async def create_user(self, user_data: UserCreate) -> UserInDB:
         """Créer un nouvel utilisateur"""
+        default_name = user_data.email.split('@')[0] if '@' in user_data.email else user_data.email
+        
         user_dict = {
             "email": user_data.email,
+            "name": user_data.name or default_name,
             "hashed_password": get_password_hash(user_data.password),
             "is_active": user_data.is_active,
             "role": user_data.role,
+            "admin": user_data.admin,
             "created_at": datetime.utcnow()
         }
         
@@ -48,24 +52,37 @@ class UserRepository:
             return UserInDB(**user_doc)
         return None
     
-    async def update_user(self, user_id: str, user_data: UserUpdate) -> Optional[UserInDB]:
-        """Mettre à jour un utilisateur"""
-        update_data = {}
+    async def update_user(self, user_id: str, update_data: dict = None, user_data: UserUpdate = None) -> Optional[UserInDB]:
+        """Mettre à jour un utilisateur
         
-        if user_data.email is not None:
-            update_data["email"] = user_data.email
-        if user_data.password is not None:
-            update_data["hashed_password"] = get_password_hash(user_data.password)
-        if user_data.is_active is not None:
-            update_data["is_active"] = user_data.is_active
-        if user_data.role is not None:
-            update_data["role"] = user_data.role
-            
+        Args:
+            user_id: ID de l'utilisateur
+            update_data: Dictionnaire de données à mettre à jour (prend la priorité)
+            user_data: Objet UserUpdate (pour compatibilité)
+        """
+        fields_to_update = {}
+        
         if update_data:
-            update_data["updated_at"] = datetime.utcnow()
+            fields_to_update = update_data.copy()
+            if "password" in fields_to_update:
+                fields_to_update["hashed_password"] = get_password_hash(fields_to_update.pop("password"))
+        elif user_data:
+            if user_data.email is not None:
+                fields_to_update["email"] = user_data.email
+            if user_data.password is not None:
+                fields_to_update["hashed_password"] = get_password_hash(user_data.password)
+            if user_data.is_active is not None:
+                fields_to_update["is_active"] = user_data.is_active
+            if user_data.role is not None:
+                fields_to_update["role"] = user_data.role
+            if user_data.admin is not None:
+                fields_to_update["admin"] = user_data.admin
+            
+        if fields_to_update:
+            fields_to_update["updated_at"] = datetime.utcnow()
             result = await self.collection.update_one(
                 {"_id": ObjectId(user_id)},
-                {"$set": update_data}
+                {"$set": fields_to_update}
             )
             if result.modified_count:
                 return await self.get_user_by_id(user_id)
@@ -92,3 +109,19 @@ class UserRepository:
         if not verify_password(password, user.hashed_password):
             return None
         return user
+    
+    async def get_all_users(self) -> List[UserInDB]:
+        """Récupérer tous les utilisateurs"""
+        cursor = self.collection.find().sort("created_at", -1)
+        users = []
+        async for user_doc in cursor:
+            users.append(UserInDB(**user_doc))
+        return users
+    
+    async def update_user_role(self, user_id: str, role: str) -> Optional[UserInDB]:
+        """Mettre à jour le rôle d'un utilisateur"""
+        return await self.update_user(user_id, update_data={"role": role})
+    
+    async def count_users(self) -> int:
+        """Compter le nombre total d'utilisateurs"""
+        return await self.collection.count_documents({})
