@@ -34,6 +34,7 @@ async def process_slack_message(question: str, channel_id: str, ts: str | None):
     response, sources, template_path = generate_answer(
         question,
         [],
+        None
     )
 
     headers = {
@@ -67,14 +68,21 @@ async def slack_events(request: Request, background_tasks: BackgroundTasks):
     Endpoint appelé par Slack 
     """
     body = await request.body()
-    verify_slack_signature(request, body)
-
     data = await request.json()
 
     event = data.get("event", {}) or {}
     # ack de slack quand on envoie un message, donc on répond ok
-    if event.get("subtype") == "bot_message":
+    if event.get("bot_id") or event.get("subtype") == "bot_message":
         return JSONResponse(content={"ok": True})
+
+    retry_num = request.headers.get("X-Slack-Retry-Num")
+    if retry_num is not None:
+        reason = request.headers.get("X-Slack-Retry-Reason")
+        event_id = data.get("event_id")
+        print(f"[Slack] Retry ignoré num={retry_num} reason={reason} event_id={event_id}")
+        return JSONResponse(content={"ok": True})
+    
+    verify_slack_signature(request, body)
 
     # pour config la connexion slack
     if data.get("type") == "url_verification":
