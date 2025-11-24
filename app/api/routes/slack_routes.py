@@ -34,7 +34,6 @@ async def process_slack_message(question: str, channel_id: str, ts: str | None):
     response, sources, template_path = generate_answer(
         question,
         [],
-        system_prompt,
     )
 
     headers = {
