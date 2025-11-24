@@ -110,11 +110,17 @@ def generate_answer(query: str, conversation_history: List[Dict[str, Any]] = Non
     
     admin_corrections = []
     try:
-        admin_corrections = vector_store.similarity_search(
+        results = vector_store.similarity_search_with_score(
             query,
-            k=3, 
-            filter={"$and": [{"type": {"$eq": "admin_correction"}}, {"priority": {"$eq": "high"}}]}
+            k=3,
+            filter={
+                "$and": [
+                    {"type": {"$eq": "admin_correction"}},
+                    {"priority": {"$eq": "high"}},
+                ]
+            },
         )
+        admin_corrections = [ doc for doc, score in results if score <= 0.4 ]
     except Exception as e:
         print(f"Erreur lors de la recherche des corrections: {e}")
         admin_corrections = []

@@ -13,6 +13,11 @@ from fastapi.openapi.models import OAuthFlows as OAuthFlowsModel
 from .config import settings
 from .database import get_database
 from bson import ObjectId
+import hmac, hashlib, time
+import os
+
+SLACK_SIGNING_SECRET = os.environ["SLACK_SIGNING_SECRET"]
+
 
 
 class OAuth2PasswordBearerCookie(SecurityBase):
@@ -159,3 +164,23 @@ async def get_current_active_user(current_user: dict = Depends(get_current_user)
     if not current_user.get("is_active", True):
         raise HTTPException(status_code=400, detail="Inactive user")
     return current_user
+
+def verify_slack_signature(request: Request, body: bytes):
+    timestamp = request.headers.get("X-Slack-Request-Timestamp", "")
+    slack_sig = request.headers.get("X-Slack-Signature", "")
+
+    if not timestamp or not slack_sig:
+        raise HTTPException(status_code=400, detail="Missing Slack headers")
+
+    if abs(time.time() - int(timestamp)) > 60 * 5:
+        raise HTTPException(status_code=400, detail="Invalid timestamp")
+
+    sig_basestring = f"v0:{timestamp}:{body.decode('utf-8')}".encode('utf-8')
+    my_sig = "v0=" + hmac.new(
+        SLACK_SIGNING_SECRET.encode('utf-8'),
+        sig_basestring,
+        hashlib.sha256
+    ).hexdigest()
+
+    if not hmac.compare_digest(my_sig, slack_sig):
+        raise HTTPException(status_code=400, detail="Invalid signature")
