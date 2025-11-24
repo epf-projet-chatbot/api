@@ -27,14 +27,14 @@ async def process_slack_message(question: str, channel_id: str, ts: str | None):
     """
 
     system_prompt = (
-        "Tu es Badinter, le chatbot de la Junior-Entreprise. "
+        "Tu t'appelles Badinter. Tu es l'assistant juridique de la junior entreprise EPF Projets, spécialisé dans le cadre légal des Junior Entreprises."
         "Réponds en français, de manière claire et utile pour les membres."
     )
 
     response, sources, template_path = generate_answer(
         question,
         [],
-        None
+        system_prompt
     )
 
     headers = {
