@@ -21,8 +21,8 @@ vector_store = Chroma(persist_directory=chroma_db_path, embedding_function=embed
 retriever = vector_store.as_retriever(
     search_type="mmr",
     search_kwargs={
-        "k": 6,
-        "fetch_k": 20,
+        "k": 5,
+        "fetch_k": 15,
         }
     )
 
