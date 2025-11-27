@@ -18,7 +18,13 @@ embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
 
 chroma_db_path = os.getenv("CHROMA_PATH", os.path.join(os.path.dirname(__file__), "chroma_db"))
 vector_store = Chroma(persist_directory=chroma_db_path, embedding_function=embeddings)
-retriever = vector_store.as_retriever(search_kwargs={"k": 5})
+retriever = vector_store.as_retriever(
+    search_type="mmr",
+    search_kwargs={
+        "k": 6,
+        "fetch_k": 20,
+        }
+    )
 
 custom_prompt = PromptTemplate.from_template("""
 Tu t'appelles Badinter. Tu es l'assistant juridique de la junior entreprise EPF Projets, spécialisé dans le cadre légal des Junior Entreprises.
