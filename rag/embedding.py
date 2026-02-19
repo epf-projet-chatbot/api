@@ -44,7 +44,9 @@ def add_to_chroma(chunks: list[Document]):
     """Ajoute des chunks à Chroma"""
     try:
         db = Chroma(persist_directory=CHROMA_PATH, embedding_function=embeddings)
+        BATCH_SIZE = 25
         max_v1 = db._client.get_max_batch_size()
+        batch_size = min(BATCH_SIZE, max_v1)
         
         existing_ids = set()
         try:
@@ -71,9 +73,9 @@ def add_to_chroma(chunks: list[Document]):
             chunk_ids.append(chunk_id)
             existing_ids.add(chunk_id)
         
-        for i in range(0, len(chunks), max_v1):
-            batch_chunks = chunks[i:i + max_v1]
-            batch_ids = chunk_ids[i:i + max_v1]
+        for i in range(0, len(chunks), batch_size):
+            batch_chunks = chunks[i:i + batch_size]
+            batch_ids = chunk_ids[i:i + batch_size]
             db.add_documents(batch_chunks, ids=batch_ids)
             time.sleep(1)
         
