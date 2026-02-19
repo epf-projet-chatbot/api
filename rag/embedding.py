@@ -76,7 +76,28 @@ def add_to_chroma(chunks: list[Document]):
         for i in range(0, len(chunks), batch_size):
             batch_chunks = chunks[i:i + batch_size]
             batch_ids = chunk_ids[i:i + batch_size]
-            db.add_documents(batch_chunks, ids=batch_ids)
+
+
+            #db.add_documents(batch_chunks, ids=batch_ids)
+
+            MAX_RETRIES = 30
+
+            for attempt in range(MAX_RETRIES):
+                try:
+                    db.add_documents(batch_chunks, ids=batch_ids)
+                    break
+                except Exception as e:
+                    msg = str(e)
+                    if "429" in msg or "ResourceExhausted" in msg or "quota" in msg.lower():
+                        # Google te dit souvent combien attendre (ici ~29s). On attend un peu plus pour être safe.
+                        sleep_s = 35 if attempt == 0 else min(120, 2 ** attempt)
+                        print(f"⏳ 429 quota → sleeping {sleep_s}s then retry ({attempt+1}/{MAX_RETRIES})")
+                        time.sleep(sleep_s)
+                        continue
+                    raise
+
+
+
             time.sleep(1)
         
     except Exception as e:
