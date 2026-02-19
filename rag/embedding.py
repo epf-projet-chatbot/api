@@ -16,7 +16,7 @@ CHROMA_PATH = os.getenv("CHROMA_PATH", os.path.join(os.path.dirname(__file__), "
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 
 # Initialisation des embeddings
-embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001", google_api_key=GOOGLE_API_KEY)
+embeddings = GoogleGenerativeAIEmbeddings(model="models/gemini-embedding-001", google_api_key=GOOGLE_API_KEY)
 
 def wait_for_api(url: str, timeout: int = 340):
     """Attend que l'API soit disponible"""

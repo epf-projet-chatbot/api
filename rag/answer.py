@@ -13,8 +13,8 @@ from .detector import detect_template_with_ai
 
 load_dotenv()
 
-llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash", temperature=0.2, google_api_key=os.getenv("GOOGLE_API_KEY"))
-embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
+llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0.2, google_api_key=os.getenv("GOOGLE_API_KEY"))
+embeddings = GoogleGenerativeAIEmbeddings(model="models/gemini-embedding-001")
 
 chroma_db_path = os.getenv("CHROMA_PATH", os.path.join(os.path.dirname(__file__), "chroma_db"))
 vector_store = Chroma(persist_directory=chroma_db_path, embedding_function=embeddings)
