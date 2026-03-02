@@ -1,8 +1,5 @@
 from langchain.prompts import PromptTemplate
 from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain_chroma import Chroma
-from langchain_google_genai import GoogleGenerativeAIEmbeddings
-from langchain_core.documents import Document
 from typing import List, Dict, Any, Tuple, Optional
 import os
 import re
@@ -10,14 +7,12 @@ from dotenv import load_dotenv
 
 from .templates import AVAILABLE_TEMPLATES, data_complete_path, get_template_path
 from .detector import detect_template_with_ai
+from .embedding import get_vector_store
 
 load_dotenv()
 
 llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0.2, google_api_key=os.getenv("GOOGLE_API_KEY"))
-embeddings = GoogleGenerativeAIEmbeddings(model="models/gemini-embedding-001")
-
-chroma_db_path = os.getenv("CHROMA_PATH", os.path.join(os.path.dirname(__file__), "chroma_db"))
-vector_store = Chroma(persist_directory=chroma_db_path, embedding_function=embeddings)
+vector_store = get_vector_store()
 retriever = vector_store.as_retriever(search_kwargs={"k": 5})
 
 custom_prompt = PromptTemplate.from_template("""

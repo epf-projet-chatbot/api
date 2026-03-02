@@ -1,24 +1,35 @@
 from langchain_chroma import Chroma
 from langchain_core.documents import Document
-import getpass
 import os
 from dotenv import load_dotenv
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
 import time
 import requests
-import re
+from functools import lru_cache
 
 load_dotenv()
 
 CHROMA_PATH = os.getenv("CHROMA_PATH", os.path.join(os.path.dirname(__file__), "chroma_db"))
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+EMBEDDING_PROVIDER = os.getenv("EMBEDDING_PROVIDER", "google").lower()
+GEMINI_EMBED_MODEL = os.getenv("GEMINI_EMBED_MODEL", "models/gemini-embedding-001")
+GEMINI_EMBED_BATCH_SIZE = int(os.getenv("GEMINI_EMBED_BATCH_SIZE", "100"))
 
 # Gemini embeddings (free-tier friendly settings)
 embeddings = GoogleGenerativeAIEmbeddings(
-    model=os.getenv("GEMINI_EMBED_MODEL", "models/gemini-embedding-001"),
+    model=GEMINI_EMBED_MODEL,
     google_api_key=GOOGLE_API_KEY,
-    batch_size=int(os.getenv("GEMINI_EMBED_BATCH_SIZE", "100")),
+    batch_size=GEMINI_EMBED_BATCH_SIZE,
 )
+
+_vector_store = None
+
+
+def get_vector_store() -> Chroma:
+    global _vector_store
+    if _vector_store is None:
+        _vector_store = Chroma(persist_directory=CHROMA_PATH, embedding_function=embeddings)
+    return _vector_store
 
 def wait_for_api(url: str, timeout: int = 340):
     for i in range(timeout):
@@ -32,6 +43,7 @@ def wait_for_api(url: str, timeout: int = 340):
     raise Exception("API timeout")
 
 
+@lru_cache(maxsize=512)
 def embed(text: str) -> list[float]:
     try:
         return embeddings.embed_query(text)
@@ -40,9 +52,10 @@ def embed(text: str) -> list[float]:
 
 def add_to_chroma(chunks: list[Document]):
     try:
-        db = Chroma(persist_directory=CHROMA_PATH, embedding_function=embeddings)
+        db = get_vector_store()
 
-        BATCH_SIZE = int(os.getenv("CHROMA_BATCH_SIZE", "3"))  # 1..5 recommended on free tier
+        default_batch_size = "5" if EMBEDDING_PROVIDER == "google" else "64"
+        BATCH_SIZE = int(os.getenv("CHROMA_BATCH_SIZE", default_batch_size))
         SLEEP_ON_429 = int(os.getenv("SLEEP_ON_429_SECONDS", "65"))
         SLEEP_BETWEEN_BATCHES = float(os.getenv("SLEEP_BETWEEN_BATCHES", "0.2"))
 
@@ -51,14 +64,6 @@ def add_to_chroma(chunks: list[Document]):
         if batch_size <= 0:
             raise Exception(f"Invalid batch_size: {batch_size}")
 
-        existing_ids = set()
-        try:
-            existing_collection = db.get()
-            if existing_collection and 'ids' in existing_collection:
-                existing_ids = set(existing_collection['ids'])
-        except:
-            pass
-
         chunk_ids = []
 
         for i, chunk in enumerate(chunks):
@@ -66,15 +71,8 @@ def add_to_chroma(chunks: list[Document]):
             page = chunk.metadata.get('page', 0)
             chunk_id = f"{source}:{page}:{i}"
 
-            counter = 0
-            original_chunk_id = chunk_id
-            while chunk_id in existing_ids or chunk_id in chunk_ids:
-                counter += 1
-                chunk_id = f"{original_chunk_id}_{counter}"
-
             chunk.metadata['id'] = chunk_id
             chunk_ids.append(chunk_id)
-            existing_ids.add(chunk_id)
 
         total = len(chunks)
         total_batches = (total + batch_size - 1) // batch_size
@@ -92,6 +90,11 @@ def add_to_chroma(chunks: list[Document]):
                     break
                 except Exception as e:
                     msg = str(e)
+                    if "existing id" in msg.lower() or "already exists" in msg.lower() or "duplicate" in msg.lower():
+                        db.delete(ids=batch_ids)
+                        db.add_documents(batch_chunks, ids=batch_ids)
+                        print(f"♻️ Batch {batch_num}/{total_batches} overwritten ({min(i+batch_size, total)}/{total})")
+                        break
                     if "429" in msg or "ResourceExhausted" in msg or "quota" in msg.lower():
                         print(f"⏳ 429 quota → sleeping {SLEEP_ON_429}s then retry (batch {batch_num}/{total_batches})")
                         time.sleep(SLEEP_ON_429)
@@ -115,7 +118,7 @@ async def add_correction_to_chroma(
 
         SLEEP_ON_429 = int(os.getenv("SLEEP_ON_429_SECONDS", "65"))
 
-        db = Chroma(persist_directory=CHROMA_PATH, embedding_function=embeddings)
+        db = get_vector_store()
 
         timestamp = datetime.now().isoformat()
         correction_id = f"correction_{admin_id}_{discussion_id}_{timestamp}"
@@ -155,7 +158,7 @@ async def add_correction_to_chroma(
 
 def get_all_corrections() -> list[dict]:
     try:
-        db = Chroma(persist_directory=CHROMA_PATH, embedding_function=embeddings)
+        db = get_vector_store()
 
         all_data = db.get(
             where={"type": "admin_correction"}
@@ -185,7 +188,7 @@ def get_all_corrections() -> list[dict]:
 
 def delete_correction_from_chroma(correction_id: str) -> bool:
     try:
-        db = Chroma(persist_directory=CHROMA_PATH, embedding_function=embeddings)
+        db = get_vector_store()
         db.delete(ids=[correction_id])
         return True
 
