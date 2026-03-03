@@ -40,7 +40,7 @@ requests==2.32.4
 # ================================
 # 🤖 RAG / AI
 # ================================
-langchain==0.3.25
+langchain==0.3.27
 langchain-core==0.3.81
 langchain-community==0.3.27
 langchain-chroma==0.2.4
