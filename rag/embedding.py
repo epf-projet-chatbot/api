@@ -17,11 +17,13 @@ def _init_embeddings() -> GoogleGenerativeAIEmbeddings:
     model_candidates = []
 
     if EMBEDDING_MODEL:
-        model_candidates.append(EMBEDDING_MODEL)
+        normalized_model = EMBEDDING_MODEL.strip()
+        if normalized_model and not normalized_model.startswith("models/"):
+            normalized_model = f"models/{normalized_model}"
+        model_candidates.append(normalized_model)
 
     model_candidates.extend([
-        "models/text-embedding-004",
-        "text-embedding-004",
+        "models/gemini-embedding-001",
         "models/embedding-001",
     ])
 
@@ -45,7 +47,7 @@ def _init_embeddings() -> GoogleGenerativeAIEmbeddings:
 
     raise RuntimeError(
         "Aucun modèle d'embedding Gemini compatible n'a pu être initialisé. "
-        "Vérifiez GOOGLE_API_KEY et GOOGLE_EMBEDDING_MODEL."
+        "Vérifiez GOOGLE_API_KEY et GOOGLE_EMBEDDING_MODEL (ex: models/gemini-embedding-001)."
     ) from last_error
 
 # Initialisation des embeddings
