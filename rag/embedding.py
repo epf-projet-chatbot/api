@@ -3,7 +3,7 @@ from langchain_chroma import Chroma
 from langchain_core.documents import Document
 import os
 from dotenv import load_dotenv
-from langchain_community.embeddings import FastEmbedEmbeddings
+from langchain_ollama import OllamaEmbeddings
 
 # Load environment variables first
 load_dotenv()
@@ -11,14 +11,16 @@ load_dotenv()
 # Chemin de la base de données Chroma (priorité à l'env pour Docker/volume persistant)
 CHROMA_PATH = os.getenv("CHROMA_PATH", os.path.join(os.path.dirname(__file__), "chroma_db"))
 
-# Modèle d'embedding local ONNX (léger, pas de PyTorch)
-EMBEDDING_MODEL_NAME = os.getenv("EMBEDDING_MODEL_NAME", "intfloat/multilingual-e5-small")
+# Embeddings via Ollama (modèle local déjà pull sur le VPS)
+OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://ollama:11434")
+OLLAMA_EMBED_MODEL = os.getenv("OLLAMA_EMBED_MODEL", "qwen3-embedding:8b")
 
-print(f"Chargement du modèle d'embedding : {EMBEDDING_MODEL_NAME}...")
-embeddings = FastEmbedEmbeddings(
-    model_name=EMBEDDING_MODEL_NAME,
+print(f"Initialisation Ollama embeddings: {OLLAMA_EMBED_MODEL} ({OLLAMA_BASE_URL})")
+embeddings = OllamaEmbeddings(
+    model=OLLAMA_EMBED_MODEL,
+    base_url=OLLAMA_BASE_URL,
 )
-print(f"Modèle d'embedding chargé : {EMBEDDING_MODEL_NAME}")
+print(f"Modèle d'embedding prêt : {OLLAMA_EMBED_MODEL}")
 
 def embed(text: str) -> list[float]:
     """

@@ -2,17 +2,19 @@ from langchain.prompts import PromptTemplate
 from langchain.chains import RetrievalQA
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_chroma import Chroma
-from langchain_community.embeddings import FastEmbedEmbeddings
+from langchain_ollama import OllamaEmbeddings
 import os
 from dotenv import load_dotenv
 load_dotenv()
 
 llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash", temperature=0.2, google_api_key=os.getenv("GOOGLE_API_KEY"))
 
-# Même modèle d'embedding que dans embedding.py (ONNX, léger)
-EMBEDDING_MODEL_NAME = os.getenv("EMBEDDING_MODEL_NAME", "intfloat/multilingual-e5-small")
-embeddings = FastEmbedEmbeddings(
-    model_name=EMBEDDING_MODEL_NAME,
+# Même modèle d'embedding que dans embedding.py (via Ollama)
+OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://ollama:11434")
+OLLAMA_EMBED_MODEL = os.getenv("OLLAMA_EMBED_MODEL", "qwen3-embedding:8b")
+embeddings = OllamaEmbeddings(
+    model=OLLAMA_EMBED_MODEL,
+    base_url=OLLAMA_BASE_URL,
 )
 
 # Chemin de la base de données Chroma (priorité à l'env pour Docker/volume persistant)
