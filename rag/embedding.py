@@ -2,6 +2,8 @@ from loader import process_documents
 from langchain_chroma import Chroma
 from langchain_core.documents import Document
 import os
+import re
+import time
 from dotenv import load_dotenv
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
 
@@ -12,8 +14,74 @@ load_dotenv()
 CHROMA_PATH = os.path.join(os.path.dirname(__file__), "chroma_db")
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 EMBEDDING_MODEL = os.getenv("GOOGLE_EMBEDDING_MODEL")
+EMBEDDING_BATCH_SIZE = int(os.getenv("EMBEDDING_BATCH_SIZE", "20"))
+EMBEDDING_MAX_RETRIES = int(os.getenv("EMBEDDING_MAX_RETRIES", "8"))
+EMBEDDING_MIN_INTERVAL_SECONDS = float(os.getenv("EMBEDDING_MIN_INTERVAL_SECONDS", "0.8"))
 
-def _init_embeddings() -> GoogleGenerativeAIEmbeddings:
+
+class RateLimitedEmbeddings:
+    def __init__(
+        self,
+        base_embeddings: GoogleGenerativeAIEmbeddings,
+        batch_size: int = 20,
+        max_retries: int = 8,
+        min_interval_seconds: float = 0.8,
+    ) -> None:
+        self.base_embeddings = base_embeddings
+        self.batch_size = max(1, batch_size)
+        self.max_retries = max(1, max_retries)
+        self.min_interval_seconds = max(0.0, min_interval_seconds)
+        self._last_request_time = 0.0
+
+    def _wait_min_interval(self) -> None:
+        elapsed = time.time() - self._last_request_time
+        sleep_seconds = self.min_interval_seconds - elapsed
+        if sleep_seconds > 0:
+            time.sleep(sleep_seconds)
+
+    def _extract_retry_delay(self, error_message: str) -> float:
+        match = re.search(r"Please retry in\s*([0-9]+(?:\.[0-9]+)?)ms", error_message)
+        if not match:
+            return 2.0
+        milliseconds = float(match.group(1))
+        return max(0.5, (milliseconds / 1000.0) + 0.2)
+
+    def _is_quota_error(self, error_message: str) -> bool:
+        lowered = error_message.lower()
+        return "429" in lowered or "quota" in lowered or "rate" in lowered
+
+    def _call_with_retries(self, texts: list[str]) -> list[list[float]]:
+        last_error = None
+        for attempt in range(1, self.max_retries + 1):
+            self._wait_min_interval()
+            try:
+                self._last_request_time = time.time()
+                return self.base_embeddings.embed_documents(texts)
+            except Exception as error:
+                last_error = error
+                message = str(error)
+                if not self._is_quota_error(message):
+                    raise
+                delay = self._extract_retry_delay(message)
+                print(
+                    f"Quota embedding atteint (tentative {attempt}/{self.max_retries}). "
+                    f"Nouvelle tentative dans {delay:.2f}s..."
+                )
+                time.sleep(delay)
+        raise last_error
+
+    def embed_documents(self, texts: list[str]) -> list[list[float]]:
+        all_vectors = []
+        for i in range(0, len(texts), self.batch_size):
+            batch = texts[i:i + self.batch_size]
+            all_vectors.extend(self._call_with_retries(batch))
+        return all_vectors
+
+    def embed_query(self, text: str) -> list[float]:
+        vectors = self._call_with_retries([text])
+        return vectors[0]
+
+def _init_embeddings() -> RateLimitedEmbeddings:
     model_candidates = []
 
     if EMBEDDING_MODEL:
@@ -37,7 +105,13 @@ def _init_embeddings() -> GoogleGenerativeAIEmbeddings:
     last_error = None
     for model in unique_candidates:
         try:
-            embedding_client = GoogleGenerativeAIEmbeddings(model=model, google_api_key=GOOGLE_API_KEY)
+            base_embedding_client = GoogleGenerativeAIEmbeddings(model=model, google_api_key=GOOGLE_API_KEY)
+            embedding_client = RateLimitedEmbeddings(
+                base_embeddings=base_embedding_client,
+                batch_size=EMBEDDING_BATCH_SIZE,
+                max_retries=EMBEDDING_MAX_RETRIES,
+                min_interval_seconds=EMBEDDING_MIN_INTERVAL_SECONDS,
+            )
             embedding_client.embed_query("ping")
             print(f"Modèle d'embedding utilisé : {model}")
             return embedding_client
