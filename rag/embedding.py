@@ -16,6 +16,7 @@ CHROMA_PATH = os.getenv("CHROMA_PATH", os.path.join(os.path.dirname(__file__), "
 OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://ollama:11434")
 OLLAMA_EMBED_MODEL = os.getenv("OLLAMA_EMBED_MODEL", "qwen3-embedding:8b")
 EMBEDDING_BATCH_SIZE = int(os.getenv("EMBEDDING_BATCH_SIZE", "4"))
+EMBED_MAX_CHARS = int(os.getenv("EMBED_MAX_CHARS", "12000"))
 
 print(f"Initialisation Ollama embeddings: {OLLAMA_EMBED_MODEL} ({OLLAMA_BASE_URL})")
 embeddings = OllamaEmbeddings(
@@ -80,11 +81,32 @@ def add_to_chroma(chunks: list[Document]) -> bool:
             chunk_ids.append(chunk_id)
             existing_ids.add(chunk_id)
 
+        # Nettoyer/filtrer les chunks avant embedding pour éviter les erreurs Ollama (400/EOF)
+        filtered_chunks = []
+        filtered_ids = []
+        skipped_empty = 0
+        truncated_count = 0
+        for chunk, chunk_id in zip(chunks_to_add, chunk_ids):
+            text = (chunk.page_content or "").replace("\x00", "").strip()
+            if not text:
+                skipped_empty += 1
+                continue
+            if len(text) > EMBED_MAX_CHARS:
+                text = text[:EMBED_MAX_CHARS]
+                truncated_count += 1
+            chunk.page_content = text
+            filtered_chunks.append(chunk)
+            filtered_ids.append(chunk_id)
+
+        chunks_to_add = filtered_chunks
+        chunk_ids = filtered_ids
+
         if not chunks_to_add:
             print("Aucun nouveau chunk à ajouter à Chroma (déjà indexé).")
             return True
 
         print(f"{len(chunks_to_add)} nouveaux chunks à ajouter sur {len(chunks)}.")
+        print(f"Chunks filtrés: vides ignorés={skipped_empty}, tronqués={truncated_count}, max_chars={EMBED_MAX_CHARS}.")
         
         # Ajouter les documents par paquets de taille adaptative
         current_batch_size = max_batch_size
@@ -104,6 +126,16 @@ def add_to_chroma(chunks: list[Document]) -> bool:
                     current_batch_size = next_batch
                     time.sleep(1)
                     continue
+                if batch_chunks and batch_ids:
+                    bad = batch_chunks[0]
+                    bad_id = batch_ids[0]
+                    text = bad.page_content or ""
+                    print("---- EMBEDDING FAILED ----")
+                    print(f"id={bad_id}")
+                    print(f"len_chars={len(text)}")
+                    print(f"start={repr(text[:200])}")
+                    print(f"end={repr(text[-200:])}")
+                    print("--------------------------")
                 print(f"Échec sur un batch de taille {current_batch_size}: {e}")
                 return False
         return True
