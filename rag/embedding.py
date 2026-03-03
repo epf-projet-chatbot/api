@@ -3,7 +3,7 @@ from langchain_chroma import Chroma
 from langchain_core.documents import Document
 import os
 from dotenv import load_dotenv
-from langchain_huggingface import HuggingFaceEmbeddings
+from langchain_community.embeddings import FastEmbedEmbeddings
 
 # Load environment variables first
 load_dotenv()
@@ -11,14 +11,12 @@ load_dotenv()
 # Chemin de la base de données Chroma (priorité à l'env pour Docker/volume persistant)
 CHROMA_PATH = os.getenv("CHROMA_PATH", os.path.join(os.path.dirname(__file__), "chroma_db"))
 
-# Modèle d'embedding Qwen3 (local, sans API externe)
-EMBEDDING_MODEL_NAME = os.getenv("EMBEDDING_MODEL_NAME", "Qwen/Qwen3-Embedding-0.6B")
+# Modèle d'embedding local ONNX (léger, pas de PyTorch)
+EMBEDDING_MODEL_NAME = os.getenv("EMBEDDING_MODEL_NAME", "intfloat/multilingual-e5-small")
 
 print(f"Chargement du modèle d'embedding : {EMBEDDING_MODEL_NAME}...")
-embeddings = HuggingFaceEmbeddings(
+embeddings = FastEmbedEmbeddings(
     model_name=EMBEDDING_MODEL_NAME,
-    model_kwargs={"device": "cpu", "trust_remote_code": True},
-    encode_kwargs={"normalize_embeddings": True},
 )
 print(f"Modèle d'embedding chargé : {EMBEDDING_MODEL_NAME}")
 
