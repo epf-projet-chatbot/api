@@ -14,9 +14,9 @@ load_dotenv()
 CHROMA_PATH = os.path.join(os.path.dirname(__file__), "chroma_db")
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 EMBEDDING_MODEL = os.getenv("GOOGLE_EMBEDDING_MODEL")
-EMBEDDING_BATCH_SIZE = int(os.getenv("EMBEDDING_BATCH_SIZE", "20"))
-EMBEDDING_MAX_RETRIES = int(os.getenv("EMBEDDING_MAX_RETRIES", "8"))
-EMBEDDING_MIN_INTERVAL_SECONDS = float(os.getenv("EMBEDDING_MIN_INTERVAL_SECONDS", "0.8"))
+EMBEDDING_BATCH_SIZE = int(os.getenv("EMBEDDING_BATCH_SIZE", "64"))
+EMBEDDING_MAX_RETRIES = int(os.getenv("EMBEDDING_MAX_RETRIES", "30"))
+EMBEDDING_MIN_INTERVAL_SECONDS = float(os.getenv("EMBEDDING_MIN_INTERVAL_SECONDS", "1.2"))
 
 
 class RateLimitedEmbeddings:
@@ -40,11 +40,22 @@ class RateLimitedEmbeddings:
             time.sleep(sleep_seconds)
 
     def _extract_retry_delay(self, error_message: str) -> float:
-        match = re.search(r"Please retry in\s*([0-9]+(?:\.[0-9]+)?)ms", error_message)
-        if not match:
-            return 2.0
-        milliseconds = float(match.group(1))
-        return max(0.5, (milliseconds / 1000.0) + 0.2)
+        seconds_block_match = re.search(r"retry_delay\s*\{\s*seconds:\s*(\d+)\s*\}", error_message, re.IGNORECASE | re.DOTALL)
+        if seconds_block_match:
+            seconds = float(seconds_block_match.group(1))
+            return max(1.0, seconds + 0.5)
+
+        seconds_match = re.search(r"Please retry in\s*([0-9]+(?:\.[0-9]+)?)s", error_message)
+        if seconds_match:
+            seconds = float(seconds_match.group(1))
+            return max(1.0, seconds + 0.2)
+
+        milliseconds_match = re.search(r"Please retry in\s*([0-9]+(?:\.[0-9]+)?)ms", error_message)
+        if milliseconds_match:
+            milliseconds = float(milliseconds_match.group(1))
+            return max(0.5, (milliseconds / 1000.0) + 0.2)
+
+        return 5.0
 
     def _is_quota_error(self, error_message: str) -> bool:
         lowered = error_message.lower()
