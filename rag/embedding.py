@@ -2,6 +2,7 @@ from loader import process_documents
 from langchain_chroma import Chroma
 from langchain_core.documents import Document
 import os
+import time
 from dotenv import load_dotenv
 from langchain_ollama import OllamaEmbeddings
 
@@ -85,12 +86,26 @@ def add_to_chroma(chunks: list[Document]) -> bool:
 
         print(f"{len(chunks_to_add)} nouveaux chunks à ajouter sur {len(chunks)}.")
         
-        # Ajouter les documents par paquets de taille max
-        for i in range(0, len(chunks_to_add), max_batch_size):
-            batch_chunks = chunks_to_add[i:i + max_batch_size]
-            batch_ids = chunk_ids[i:i + max_batch_size]
-            db.add_documents(batch_chunks, ids=batch_ids)
-            print(f"{len(batch_chunks)} chunks ajoutés à la base de données Chroma.")
+        # Ajouter les documents par paquets de taille adaptative
+        current_batch_size = max_batch_size
+        index = 0
+        while index < len(chunks_to_add):
+            batch_chunks = chunks_to_add[index:index + current_batch_size]
+            batch_ids = chunk_ids[index:index + current_batch_size]
+            try:
+                db.add_documents(batch_chunks, ids=batch_ids)
+                index += len(batch_chunks)
+                print(f"{len(batch_chunks)} chunks ajoutés à la base de données Chroma.")
+            except Exception as e:
+                message = str(e).lower()
+                if ("signal: killed" in message or "status code: 500" in message or "runner process has terminated" in message) and current_batch_size > 1:
+                    next_batch = max(1, current_batch_size // 2)
+                    print(f"Batch trop grand ({current_batch_size}). Nouvelle tentative avec batch={next_batch}.")
+                    current_batch_size = next_batch
+                    time.sleep(1)
+                    continue
+                print(f"Échec sur un batch de taille {current_batch_size}: {e}")
+                return False
         return True
         
     except Exception as e:

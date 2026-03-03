@@ -18,7 +18,7 @@ services:
       - MONGODB_URL=mongodb://mongo:27017
       - DATABASE_NAME=chatbot_db
       - CHROMA_PATH=./chroma_db
-      - GOOGLE_API_KEY=AIzaSyAyhGYRL5yAJkvbE9VMHwYaFsG7Q0zpcEo
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY:?GOOGLE_API_KEY is required}
       - CORS_ORIGINS=http://localhost:3000,http://localhost:3001,http://localhost:3002,http://127.0.0.1:3000,http://127.0.0.1:3001,http://127.0.0.1:3002
       - BASE_URL=http://localhost:8000
       - ENVIRONMENT=development
