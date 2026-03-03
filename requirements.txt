@@ -51,6 +51,7 @@ langchain-core==0.3.65
 langchain-community==0.3.25
 langchain-chroma==0.2.4
 langchain-google-genai==2.1.5
+langchain-huggingface>=0.1.0
 langchain-text-splitters==0.3.8
 langsmith==0.3.45
 
@@ -61,6 +62,11 @@ chromadb>=0.5.0
 google-ai-generativelanguage==0.6.18
 google-api-core==2.25.1
 google-auth==2.40.3
+
+# Qwen3 Embedding (local)
+sentence-transformers>=3.0.0
+torch>=2.0.0
+transformers>=4.40.0
 
 # Text processing & NLP
 spacy==3.8.7

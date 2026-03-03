@@ -2,17 +2,23 @@ from langchain.prompts import PromptTemplate
 from langchain.chains import RetrievalQA
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_chroma import Chroma
-from langchain_google_genai import GoogleGenerativeAIEmbeddings
+from langchain_huggingface import HuggingFaceEmbeddings
 import os
 from dotenv import load_dotenv
 load_dotenv()
 
 llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash", temperature=0.2, google_api_key=os.getenv("GOOGLE_API_KEY"))
 
-embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
+# Même modèle d'embedding Qwen3 que dans embedding.py
+EMBEDDING_MODEL_NAME = os.getenv("EMBEDDING_MODEL_NAME", "Qwen/Qwen3-Embedding-0.6B")
+embeddings = HuggingFaceEmbeddings(
+    model_name=EMBEDDING_MODEL_NAME,
+    model_kwargs={"device": "cpu", "trust_remote_code": True},
+    encode_kwargs={"normalize_embeddings": True},
+)
 
-# Chemin de la base de données Chroma adapté pour Docker et développement local
-chroma_db_path = os.path.join(os.path.dirname(__file__), "chroma_db")
+# Chemin de la base de données Chroma (priorité à l'env pour Docker/volume persistant)
+chroma_db_path = os.getenv("CHROMA_PATH", os.path.join(os.path.dirname(__file__), "chroma_db"))
 
 vector_store = Chroma(persist_directory=chroma_db_path, embedding_function=embeddings)
 retriever = vector_store.as_retriever(search_kwargs={"k": 5})

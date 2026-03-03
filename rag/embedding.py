@@ -1,20 +1,26 @@
 from loader import process_documents
 from langchain_chroma import Chroma
 from langchain_core.documents import Document
-import getpass
 import os
 from dotenv import load_dotenv
-from langchain_google_genai import GoogleGenerativeAIEmbeddings
+from langchain_huggingface import HuggingFaceEmbeddings
 
 # Load environment variables first
 load_dotenv()
 
-# Chemin de la base de données Chroma adapté pour être au même niveau qu'answer.py
-CHROMA_PATH = os.path.join(os.path.dirname(__file__), "chroma_db")
-GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+# Chemin de la base de données Chroma (priorité à l'env pour Docker/volume persistant)
+CHROMA_PATH = os.getenv("CHROMA_PATH", os.path.join(os.path.dirname(__file__), "chroma_db"))
 
-# Initialisation des embeddings
-embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001", google_api_key=GOOGLE_API_KEY)
+# Modèle d'embedding Qwen3 (local, sans API externe)
+EMBEDDING_MODEL_NAME = os.getenv("EMBEDDING_MODEL_NAME", "Qwen/Qwen3-Embedding-0.6B")
+
+print(f"Chargement du modèle d'embedding : {EMBEDDING_MODEL_NAME}...")
+embeddings = HuggingFaceEmbeddings(
+    model_name=EMBEDDING_MODEL_NAME,
+    model_kwargs={"device": "cpu", "trust_remote_code": True},
+    encode_kwargs={"normalize_embeddings": True},
+)
+print(f"Modèle d'embedding chargé : {EMBEDDING_MODEL_NAME}")
 
 def embed(text: str) -> list[float]:
     """
