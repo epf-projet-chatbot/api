@@ -121,3 +121,4 @@ certifi==2025.6.15
 urllib3==2.4.0
 idna==3.10
 charset-normalizer==3.4.2
+chardet==5.2.0
