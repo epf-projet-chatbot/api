@@ -1,167 +1,275 @@
-from loader import process_documents
+from __future__ import annotations
+
+import hashlib
+import os
+import re
+import sys
+import time
+from copy import deepcopy
+from typing import Iterable, List, Tuple
+
+from dotenv import load_dotenv
 from langchain_chroma import Chroma
 from langchain_core.documents import Document
-import os
-import time
-from dotenv import load_dotenv
 from langchain_ollama import OllamaEmbeddings
 
-# Load environment variables first
+from loader import process_documents
+
 load_dotenv()
 
-# Chemin de la base de données Chroma (priorité à l'env pour Docker/volume persistant)
-CHROMA_PATH = os.getenv("CHROMA_PATH", os.path.join(os.path.dirname(__file__), "chroma_db"))
+# ----------------------------
+# Config
+# ----------------------------
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+DEFAULT_DATA_PATH = os.path.join(SCRIPT_DIR, "data", "data_complete")
 
-# Embeddings via Ollama (modèle local déjà pull sur le VPS)
+CHROMA_PATH = os.getenv("CHROMA_PATH", os.path.join(SCRIPT_DIR, "chroma_db"))
+
 OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://ollama:11434")
-OLLAMA_EMBED_MODEL = os.getenv("OLLAMA_EMBED_MODEL", "qwen3-embedding:8b")
-EMBEDDING_BATCH_SIZE = int(os.getenv("EMBEDDING_BATCH_SIZE", "4"))
+OLLAMA_EMBED_MODEL = os.getenv("OLLAMA_EMBED_MODEL", "qwen3-embedding:4b")
+
+# Batch côté application (Chroma + Ollama peuvent être sensibles)
+BATCH_SIZE = int(os.getenv("EMBEDDING_BATCH_SIZE", "8"))
+
+# Garde-fous (juridique => chunks parfois énormes)
 EMBED_MAX_CHARS = int(os.getenv("EMBED_MAX_CHARS", "12000"))
+EMBED_MIN_SPLIT_CHARS = int(os.getenv("EMBED_MIN_SPLIT_CHARS", "1200"))
+MAX_SPLIT_DEPTH = int(os.getenv("EMBED_MAX_SPLIT_DEPTH", "8"))  # 2^8 = 256 sous-chunks max
 
-print(f"Initialisation Ollama embeddings: {OLLAMA_EMBED_MODEL} ({OLLAMA_BASE_URL})")
-embeddings = OllamaEmbeddings(
-    model=OLLAMA_EMBED_MODEL,
-    base_url=OLLAMA_BASE_URL,
-)
-print(f"Modèle d'embedding prêt : {OLLAMA_EMBED_MODEL}")
+# Retries soft (réseau/runner)
+RETRY_SLEEP_SEC = float(os.getenv("EMBED_RETRY_SLEEP_SEC", "0.8"))
+MAX_RETRIES = int(os.getenv("EMBED_MAX_RETRIES", "2"))
 
-def embed(text: str) -> list[float]:
+_WHITESPACE_RE = re.compile(r"\s+")
+
+
+def normalize_text(text: str) -> str:
+    """Nettoyage fort (évite 400 sur inputs bizarres)."""
+    if not text:
+        return ""
+    t = text.replace("\x00", "")  # NUL bytes
+    t = t.strip()
+    t = _WHITESPACE_RE.sub(" ", t)
+    return t
+
+
+def stable_chunk_id(source: str, page: int, text: str) -> str:
     """
-    Vectorise un texte en utilisant Google Generative AI Embeddings.
-    
-    Args:
-        text (str): Le texte à vectoriser.
-        
-    Returns:
-        list[float]: Le vecteur d'embedding du texte.
+    ID stable basé sur (source, page, contenu nettoyé).
+    Évite de dépendre de l'index i qui change au moindre re-split.
     """
-    try:
-        # Utilisation de l'API LangChain pour générer l'embedding
-        result = embeddings.embed_query(text)
-        return result
-    except Exception as e:
-        print(f"Erreur lors de la vectorisation : {e}")
-        return []
+    h = hashlib.sha1()
+    h.update(source.encode("utf-8", errors="ignore"))
+    h.update(b"\x1f")
+    h.update(str(page).encode("utf-8"))
+    h.update(b"\x1f")
+    h.update(text.encode("utf-8", errors="ignore"))
+    return f"{source}:{page}:{h.hexdigest()}"
 
-def add_to_chroma(chunks: list[Document]) -> bool:
+
+def prepare_chunks(docs: List[Document]) -> Tuple[List[Document], List[str], dict]:
     """
-    Ajoute des chunks à la base de données Chroma.
-    
-    Args:
-        chunks (list[Document]): Liste de documents à ajouter.
+    - Nettoie le texte
+    - Ignore vides
+    - Tronque au max
+    - Génère des ids stables
     """
-    try:
-        db = Chroma(persist_directory=CHROMA_PATH, embedding_function=embeddings)
-        max_batch_size = max(1, min(db._client.get_max_batch_size(), EMBEDDING_BATCH_SIZE))
-        print(f"Taille de batch embedding utilisée: {max_batch_size}")
-        # Obtenir les IDs existants pour éviter les doublons
-        existing_ids = set()
-        try:
-            existing_collection = db.get()
-            if existing_collection and 'ids' in existing_collection:
-                existing_ids = set(existing_collection['ids'])
-        except:
-            pass
-        
-        chunks_to_add = []
-        chunk_ids = []
-        
-        for i, chunk in enumerate(chunks):
-            source = chunk.metadata.get('source', 'unknown')
-            page = chunk.metadata.get('page', 0)
-            
-            # Format: document_id:page_id:chunk_index
-            chunk_id = f"{source}:{page}:{i}"
+    prepared: List[Document] = []
+    ids: List[str] = []
 
-            if chunk_id in existing_ids:
-                continue
-            
-            chunk.metadata['id'] = chunk_id
-            chunks_to_add.append(chunk)
-            chunk_ids.append(chunk_id)
-            existing_ids.add(chunk_id)
+    stats = {
+        "input_docs": len(docs),
+        "kept": 0,
+        "skipped_empty": 0,
+        "truncated": 0,
+    }
 
-        # Nettoyer/filtrer les chunks avant embedding pour éviter les erreurs Ollama (400/EOF)
-        filtered_chunks = []
-        filtered_ids = []
-        skipped_empty = 0
-        truncated_count = 0
-        for chunk, chunk_id in zip(chunks_to_add, chunk_ids):
-            text = (chunk.page_content or "").replace("\x00", "").strip()
-            if not text:
-                skipped_empty += 1
-                continue
-            if len(text) > EMBED_MAX_CHARS:
-                text = text[:EMBED_MAX_CHARS]
-                truncated_count += 1
-            chunk.page_content = text
-            filtered_chunks.append(chunk)
-            filtered_ids.append(chunk_id)
+    for d in docs:
+        source = d.metadata.get("source", "unknown")
+        page = int(d.metadata.get("page", 0))
 
-        chunks_to_add = filtered_chunks
-        chunk_ids = filtered_ids
+        t = normalize_text(d.page_content or "")
+        if not t:
+            stats["skipped_empty"] += 1
+            continue
 
-        if not chunks_to_add:
-            print("Aucun nouveau chunk à ajouter à Chroma (déjà indexé).")
-            return True
+        if len(t) > EMBED_MAX_CHARS:
+            t = t[:EMBED_MAX_CHARS]
+            stats["truncated"] += 1
 
-        print(f"{len(chunks_to_add)} nouveaux chunks à ajouter sur {len(chunks)}.")
-        print(f"Chunks filtrés: vides ignorés={skipped_empty}, tronqués={truncated_count}, max_chars={EMBED_MAX_CHARS}.")
-        
-        # Ajouter les documents par paquets de taille adaptative
-        current_batch_size = max_batch_size
-        index = 0
-        while index < len(chunks_to_add):
-            batch_chunks = chunks_to_add[index:index + current_batch_size]
-            batch_ids = chunk_ids[index:index + current_batch_size]
+        # Copie légère pour ne pas muter l'input
+        nd = Document(page_content=t, metadata=deepcopy(d.metadata))
+        cid = stable_chunk_id(source, page, t)
+        nd.metadata["id"] = cid
+
+        prepared.append(nd)
+        ids.append(cid)
+
+    stats["kept"] = len(prepared)
+    return prepared, ids, stats
+
+
+def split_in_two(doc: Document, doc_id: str) -> Tuple[List[Document], List[str]]:
+    """Split simple en 2 (dichotomie) avec ids dérivés."""
+    t = doc.page_content or ""
+    mid = len(t) // 2
+    left = normalize_text(t[:mid])
+    right = normalize_text(t[mid:])
+
+    out_docs: List[Document] = []
+    out_ids: List[str] = []
+
+    if left:
+        d1 = Document(page_content=left, metadata=deepcopy(doc.metadata))
+        d1.metadata["id"] = f"{doc_id}::a"
+        out_docs.append(d1)
+        out_ids.append(d1.metadata["id"])
+    if right:
+        d2 = Document(page_content=right, metadata=deepcopy(doc.metadata))
+        d2.metadata["id"] = f"{doc_id}::b"
+        out_docs.append(d2)
+        out_ids.append(d2.metadata["id"])
+
+    return out_docs, out_ids
+
+
+def is_bad_request(err: Exception) -> bool:
+    m = str(err).lower()
+    return ("status code: 400" in m) or (" eof" in m) or ("do embedding request" in m)
+
+
+def is_transient(err: Exception) -> bool:
+    m = str(err).lower()
+    return (
+        "runner process has terminated" in m
+        or "status code: 500" in m
+        or "signal: killed" in m
+        or "connection reset" in m
+        or "timeout" in m
+    )
+
+
+def add_to_chroma(docs: List[Document]) -> bool:
+    print(f"Initialisation Ollama embeddings: {OLLAMA_EMBED_MODEL} ({OLLAMA_BASE_URL})")
+    embeddings = OllamaEmbeddings(model=OLLAMA_EMBED_MODEL, base_url=OLLAMA_BASE_URL)
+    print(f"Modèle d'embedding prêt : {OLLAMA_EMBED_MODEL}")
+
+    db = Chroma(persist_directory=CHROMA_PATH, embedding_function=embeddings)
+
+    chunks, ids, stats = prepare_chunks(docs)
+    print(
+        f"Préparation chunks: input={stats['input_docs']} kept={stats['kept']} "
+        f"skipped_empty={stats['skipped_empty']} truncated={stats['truncated']} "
+        f"max_chars={EMBED_MAX_CHARS}"
+    )
+
+    if not chunks:
+        print("Aucun chunk valide à indexer.")
+        return True
+
+    # Déduplication intra-run (évite re-ajout si split / collisions)
+    seen = set()
+    filtered_chunks, filtered_ids = [], []
+    for c, cid in zip(chunks, ids):
+        if cid in seen:
+            continue
+        seen.add(cid)
+        filtered_chunks.append(c)
+        filtered_ids.append(cid)
+    chunks, ids = filtered_chunks, filtered_ids
+
+    print(f"Indexation: {len(chunks)} chunks, batch_size={BATCH_SIZE}")
+
+    index = 0
+    split_count = 0
+    skipped_count = 0
+
+    while index < len(chunks):
+        batch_chunks = chunks[index : index + BATCH_SIZE]
+        batch_ids = ids[index : index + BATCH_SIZE]
+
+        # retries transients (sans réduire batch ici; on est déjà prudent)
+        attempt = 0
+        while True:
             try:
                 db.add_documents(batch_chunks, ids=batch_ids)
-                index += len(batch_chunks)
-                print(f"{len(batch_chunks)} chunks ajoutés à la base de données Chroma.")
+                break
             except Exception as e:
-                message = str(e).lower()
-                if ("signal: killed" in message or "status code: 500" in message or "runner process has terminated" in message) and current_batch_size > 1:
-                    next_batch = max(1, current_batch_size // 2)
-                    print(f"Batch trop grand ({current_batch_size}). Nouvelle tentative avec batch={next_batch}.")
-                    current_batch_size = next_batch
-                    time.sleep(1)
+                attempt += 1
+                if is_transient(e) and attempt <= MAX_RETRIES:
+                    print(f"[WARN] Erreur transitoire (attempt {attempt}/{MAX_RETRIES}): {e}")
+                    time.sleep(RETRY_SLEEP_SEC)
                     continue
-                if batch_chunks and batch_ids:
-                    bad = batch_chunks[0]
-                    bad_id = batch_ids[0]
-                    text = bad.page_content or ""
-                    print("---- EMBEDDING FAILED ----")
-                    print(f"id={bad_id}")
-                    print(f"len_chars={len(text)}")
-                    print(f"start={repr(text[:200])}")
-                    print(f"end={repr(text[-200:])}")
-                    print("--------------------------")
-                print(f"Échec sur un batch de taille {current_batch_size}: {e}")
-                return False
-        return True
-        
-    except Exception as e:
-        print(f"Erreur lors de l'ajout à Chroma : {e}")
-        return False
+
+                # Si batch>1 et ça casse, on réduit à 1 pour isoler le coupable
+                if len(batch_chunks) > 1:
+                    # remplace ce batch par des batches unitaires
+                    chunks[index : index + len(batch_chunks)] = batch_chunks
+                    ids[index : index + len(batch_ids)] = batch_ids
+                    # force traitement unitaire en baissant BATCH_SIZE localement
+                    # (sans toucher la config globale)
+                    print("[WARN] Batch failed -> fallback en traitement unitaire pour isoler le chunk.")
+                    # On traite le premier item en solo tout de suite
+                    batch_chunks = [chunks[index]]
+                    batch_ids = [ids[index]]
+                    attempt = 0
+                    continue
+
+                # Ici batch=1 : on log et on tente split si BAD REQUEST
+                bad_doc = batch_chunks[0]
+                bad_id = batch_ids[0]
+                txt = bad_doc.page_content or ""
+                print("---- EMBEDDING FAILED ----")
+                print(f"id={bad_id}")
+                print(f"len_chars={len(txt)}")
+                print(f"start={repr(txt[:200])}")
+                print(f"end={repr(txt[-200:])}")
+                print(f"error={e}")
+                print("--------------------------")
+
+                if is_bad_request(e) and len(txt) >= EMBED_MIN_SPLIT_CHARS:
+                    # Split dichotomique, limité en profondeur
+                    depth = int(bad_doc.metadata.get("_split_depth", 0))
+                    if depth < MAX_SPLIT_DEPTH:
+                        new_docs, new_ids = split_in_two(bad_doc, bad_id)
+                        if new_docs:
+                            for nd in new_docs:
+                                nd.metadata["_split_depth"] = depth + 1
+                            chunks[index : index + 1] = new_docs
+                            ids[index : index + 1] = new_ids
+                            split_count += 1
+                            print(f"[INFO] Chunk scindé (depth {depth+1}) en {len(new_docs)} sous-chunks. Retry...")
+                            attempt = 0
+                            continue
+
+                # Sinon on skip ce chunk et on continue
+                skipped_count += 1
+                print(f"[WARN] Chunk ignoré (id={bad_id}).")
+                index += 1
+                break
+
+        # succès batch
+        print(f"[OK] Ajouté: {len(batch_chunks)} chunks")
+        index += len(batch_chunks)
+
+    print(f"Terminé. split_count={split_count} skipped_count={skipped_count}")
+    return True
+
+
+def main() -> int:
+    data_path = os.getenv("DATA_PATH", DEFAULT_DATA_PATH)
+    if not os.path.exists(data_path):
+        print(f"Erreur : Le répertoire {data_path} n'existe pas.", file=sys.stderr)
+        return 2
+
+    docs = process_documents(data_path)
+    if not docs:
+        print("Aucun document trouvé à traiter.")
+        return 0
+
+    ok = add_to_chroma(docs)
+    return 0 if ok else 1
+
 
 if __name__ == "__main__":
-    """
-    Point d'entrée pour le script.
-    Charge les documents, les prétraite, les vectorise et les ajoute à la base de données Chroma.
-    """
-    
-    # Chargement et ajout des documents
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    data_path = os.path.join(script_dir, "data", "data_complete")
-    if not os.path.exists(data_path):
-        print(f"Erreur : Le répertoire {data_path} n'existe pas.")
-        exit(1)
-    
-    documents = process_documents(data_path)
-    if documents:
-        if add_to_chroma(documents):
-            print("Chroma DB mise à jour avec succès.")
-        else:
-            print("Échec de la mise à jour de Chroma DB.")
-    else:
-        print("Aucun document trouvé à traiter.")
+    raise SystemExit(main())
