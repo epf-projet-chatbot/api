@@ -175,32 +175,36 @@ def add_to_chroma(chunks: list[Document]) -> bool:
         except:
             pass
         
+        chunks_to_add = []
         chunk_ids = []
-        
+
         for i, chunk in enumerate(chunks):
             source = chunk.metadata.get('source', 'unknown')
             page = chunk.metadata.get('page', 0)
             
             # Format: document_id:page_id:chunk_index
             chunk_id = f"{source}:{page}:{i}"
-            
-            # S'assurer qu'il n'y a pas de doublons
-            counter = 0
-            original_chunk_id = chunk_id
-            while chunk_id in existing_ids or chunk_id in chunk_ids:
-                counter += 1
-                chunk_id = f"{original_chunk_id}_{counter}"
-            
+
+            if chunk_id in existing_ids:
+                continue
+
             chunk.metadata['id'] = chunk_id
+            chunks_to_add.append(chunk)
             chunk_ids.append(chunk_id)
             existing_ids.add(chunk_id)
+
+        if not chunks_to_add:
+            print("Aucun nouveau chunk à ajouter à Chroma (déjà indexé).")
+            return True
+
+        print(f"{len(chunks_to_add)} nouveaux chunks à ajouter sur {len(chunks)}.")
         
         # Ajouter les documents par paquets de taille max
-        for i in range(0, len(chunks), max_batch_size):
-            batch_chunks = chunks[i:i + max_batch_size]
+        for i in range(0, len(chunks_to_add), max_batch_size):
+            batch_chunks = chunks_to_add[i:i + max_batch_size]
             batch_ids = chunk_ids[i:i + max_batch_size]
             db.add_documents(batch_chunks, ids=batch_ids)
-            print(f"{len(chunks)} chunks ajoutés à la base de données Chroma.")
+            print(f"{len(batch_chunks)} chunks ajoutés à la base de données Chroma.")
         return True
         
     except Exception as e:
