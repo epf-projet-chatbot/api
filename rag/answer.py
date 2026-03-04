@@ -7,7 +7,13 @@ import os
 from dotenv import load_dotenv
 load_dotenv()
 
-llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash", temperature=0.2, google_api_key=os.getenv("GOOGLE_API_KEY"))
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+
+llm = ChatGoogleGenerativeAI(
+    model=GEMINI_MODEL,
+    temperature=0.2,
+    google_api_key=os.getenv("GOOGLE_API_KEY"),
+)
 
 # Même modèle d'embedding que dans embedding.py (via Ollama)
 OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://ollama:11434")

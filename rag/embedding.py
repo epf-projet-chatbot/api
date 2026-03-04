@@ -30,6 +30,7 @@ OLLAMA_EMBED_MODEL = os.getenv("OLLAMA_EMBED_MODEL", "qwen3-embedding:4b")
 
 # Batch côté application (Chroma + Ollama peuvent être sensibles)
 BATCH_SIZE = int(os.getenv("EMBEDDING_BATCH_SIZE", "8"))
+MAX_BATCH_CHARS = int(os.getenv("EMBED_MAX_BATCH_CHARS", "12000"))
 
 # Garde-fous (juridique => chunks parfois énormes)
 EMBED_MAX_CHARS = int(os.getenv("EMBED_MAX_CHARS", "12000"))
@@ -185,8 +186,34 @@ def add_to_chroma(docs: List[Document]) -> bool:
     skipped_count = 0
 
     while index < len(chunks):
-        batch_chunks = chunks[index : index + BATCH_SIZE]
-        batch_ids = ids[index : index + BATCH_SIZE]
+        batch_chunks: List[Document] = []
+        batch_ids: List[str] = []
+        batch_chars = 0
+
+        probe = index
+        while probe < len(chunks) and len(batch_chunks) < BATCH_SIZE:
+            candidate = chunks[probe]
+            candidate_len = len(candidate.page_content or "")
+            if batch_chunks and (batch_chars + candidate_len) > MAX_BATCH_CHARS:
+                break
+            batch_chunks.append(candidate)
+            batch_ids.append(ids[probe])
+            batch_chars += candidate_len
+            probe += 1
+
+        if not batch_chunks:
+            # Fallback sécurité: toujours traiter au moins 1 chunk
+            batch_chunks = [chunks[index]]
+            batch_ids = [ids[index]]
+            batch_chars = len(chunks[index].page_content or "")
+
+        batch_start = index + 1
+        batch_end = index + len(batch_chunks)
+        start_time = time.perf_counter()
+        print(
+            f"[PROGRESS] Batch {batch_start}-{batch_end}/{len(chunks)} "
+            f"items={len(batch_chunks)} chars={batch_chars}"
+        )
 
         # retries transients (sans réduire batch ici; on est déjà prudent)
         attempt = 0
@@ -249,7 +276,8 @@ def add_to_chroma(docs: List[Document]) -> bool:
                 break
 
         # succès batch
-        print(f"[OK] Ajouté: {len(batch_chunks)} chunks")
+        elapsed = time.perf_counter() - start_time
+        print(f"[OK] Ajouté: {len(batch_chunks)} chunks en {elapsed:.2f}s")
         index += len(batch_chunks)
 
     print(f"Terminé. split_count={split_count} skipped_count={skipped_count}")
