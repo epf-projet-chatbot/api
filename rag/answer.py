@@ -1,9 +1,7 @@
 from langchain.prompts import PromptTemplate
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_chroma import Chroma
-from langchain_google_genai import GoogleGenerativeAIEmbeddings
-from langchain_core.documents import Document
-from typing import List, Dict, Any, Tuple, Optional
+from langchain_ollama import OllamaEmbeddings
 import os
 import re
 from dotenv import load_dotenv
@@ -13,8 +11,24 @@ from .detector import detect_template_with_ai
 
 load_dotenv()
 
-llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0.2, google_api_key=os.getenv("GOOGLE_API_KEY"))
-embeddings = GoogleGenerativeAIEmbeddings(model="models/gemini-embedding-001")
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+
+llm = ChatGoogleGenerativeAI(
+    model=GEMINI_MODEL,
+    temperature=0.2,
+    google_api_key=os.getenv("GOOGLE_API_KEY"),
+)
+
+# Même modèle d'embedding que dans embedding.py (via Ollama)
+OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://ollama:11434")
+OLLAMA_EMBED_MODEL = os.getenv("OLLAMA_EMBED_MODEL", "qwen3-embedding:8b")
+embeddings = OllamaEmbeddings(
+    model=OLLAMA_EMBED_MODEL,
+    base_url=OLLAMA_BASE_URL,
+)
+
+# Chemin de la base de données Chroma (priorité à l'env pour Docker/volume persistant)
+chroma_db_path = os.getenv("CHROMA_PATH", os.path.join(os.path.dirname(__file__), "chroma_db"))
 
 chroma_db_path = os.getenv("CHROMA_PATH", os.path.join(os.path.dirname(__file__), "chroma_db"))
 vector_store = Chroma(persist_directory=chroma_db_path, embedding_function=embeddings)
