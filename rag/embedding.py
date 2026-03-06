@@ -6,7 +6,7 @@ import re
 import sys
 import time
 from copy import deepcopy
-from typing import Iterable, List, Tuple
+from typing import List, Tuple
 
 from dotenv import load_dotenv
 from langchain_chroma import Chroma
@@ -42,6 +42,12 @@ RETRY_SLEEP_SEC = float(os.getenv("EMBED_RETRY_SLEEP_SEC", "0.8"))
 MAX_RETRIES = int(os.getenv("EMBED_MAX_RETRIES", "2"))
 
 _WHITESPACE_RE = re.compile(r"\s+")
+
+def get_embeddings() -> OllamaEmbeddings:
+    return OllamaEmbeddings(
+        model=OLLAMA_EMBED_MODEL,
+        base_url=OLLAMA_BASE_URL,
+    )
 
 
 def normalize_text(text: str) -> str:
@@ -152,7 +158,7 @@ def is_transient(err: Exception) -> bool:
 
 def add_to_chroma(docs: List[Document]) -> bool:
     print(f"Initialisation Ollama embeddings: {OLLAMA_EMBED_MODEL} ({OLLAMA_BASE_URL})")
-    embeddings = OllamaEmbeddings(model=OLLAMA_EMBED_MODEL, base_url=OLLAMA_BASE_URL)
+    embeddings = get_embeddings()
     print(f"Modèle d'embedding prêt : {OLLAMA_EMBED_MODEL}")
 
     db = Chroma(persist_directory=CHROMA_PATH, embedding_function=embeddings)
@@ -283,6 +289,51 @@ def add_to_chroma(docs: List[Document]) -> bool:
     print(f"Terminé. split_count={split_count} skipped_count={skipped_count}")
     return True
 
+
+def get_all_corrections() -> list[dict]:
+    """
+    Récupère toutes les corrections admin depuis ChromaDB
+    """
+    try:
+        db = Chroma(persist_directory=CHROMA_PATH, embedding_function=get_embeddings())
+        
+        all_data = db.get(
+            where={"type": "admin_correction"}
+        )
+        
+        corrections = []
+        if all_data and 'ids' in all_data:
+            for i, doc_id in enumerate(all_data['ids']):
+                metadata = all_data['metadatas'][i] if 'metadatas' in all_data and i < len(all_data['metadatas']) else {}
+                content = all_data['documents'][i] if 'documents' in all_data and i < len(all_data['documents']) else ""
+                
+                corrections.append({
+                    "id": doc_id,
+                    "content": content,
+                    "admin_id": metadata.get("admin_id", "unknown"),
+                    "discussion_id": metadata.get("discussion_id", ""),
+                    "context_question": metadata.get("context_question", ""),
+                    "created_at": metadata.get("created_at", ""),
+                    "priority": metadata.get("priority", "high")
+                })
+        
+        return sorted(corrections, key=lambda x: x.get("created_at", ""), reverse=True)
+        
+    except Exception as e:
+        raise Exception(f"Erreur lors de la récupération des corrections: {e}")
+
+
+def delete_correction_from_chroma(correction_id: str) -> bool:
+    """
+    Supprime une correction de ChromaDB
+    """
+    try:
+        db = Chroma(persist_directory=CHROMA_PATH, embedding_function=get_embeddings())
+        db.delete(ids=[correction_id])
+        return True
+        
+    except Exception as e:
+        raise Exception(f"Erreur lors de la suppression de la correction: {e}")
 
 def main() -> int:
     data_path = os.getenv("DATA_PATH", DEFAULT_DATA_PATH)
