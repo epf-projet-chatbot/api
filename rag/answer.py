@@ -5,6 +5,7 @@ from langchain_ollama import OllamaEmbeddings
 import os
 import re
 from dotenv import load_dotenv
+from typing import List, Dict, Any
 
 from .templates import AVAILABLE_TEMPLATES, data_complete_path, get_template_path
 from .detector import detect_template_with_ai
