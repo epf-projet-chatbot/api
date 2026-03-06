@@ -13,7 +13,7 @@ from langchain_chroma import Chroma
 from langchain_core.documents import Document
 from langchain_ollama import OllamaEmbeddings
 
-from loader import process_documents
+from rag.loader import process_documents
 
 load_dotenv()
 
