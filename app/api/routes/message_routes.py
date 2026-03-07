@@ -7,7 +7,7 @@ from bson.errors import InvalidId
 from rag.answer import generate_answer
 from api.services.message_service import MessageService
 from api.schemas.message_schemas import MessageCreate, BotQuery, BotQueryWithHistory
-from core.dependencies import get_message_service
+from core.dependencies import get_message_service, get_current_user
 from core.config import settings
 
 router = APIRouter(
@@ -51,13 +51,14 @@ async def create_messages(
 async def create_bot_message(
     discussion_id: str, 
     payload: BotQueryWithHistory,
-    message_service: MessageService = Depends(get_message_service)
+    message_service: MessageService = Depends(get_message_service),
+    current_user: dict = Depends(get_current_user)
 ):
     """Créer un message bot avec réponse RAG"""
     query = payload.query
     system_prompt = payload.system_prompt
     history_limit = payload.history_limit or 10
-    user_id = payload.user_id 
+    user_id = current_user.get("_id")
 
     
     if not discussion_id or not query:
