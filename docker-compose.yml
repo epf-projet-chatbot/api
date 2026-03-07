@@ -23,6 +23,7 @@ services:
       - BASE_URL=http://localhost:8000
       - ENVIRONMENT=development
       - PYTHONPATH=/app
+      - RAG_DEBUG_RETRIEVAL=true
     volumes:
       - uploads-data:/app/uploads  # Persistent uploads
       - chroma-data:/app/chroma_db  # Persistent vector database

@@ -1,4 +1,5 @@
 import os
+from typing import Optional
 
 data_complete_path = os.path.join(os.path.dirname(__file__), "data", "data_complete")
 
@@ -17,6 +18,8 @@ AVAILABLE_TEMPLATES = {
     "Procès-Verbal de Recette Finale - AGP_CRP_25.pdf": "Procès-verbal de recette finale (PV de recette)",
 }
 
-def get_template_path(filename: str) -> str:
+def get_template_path(filename: str) -> Optional[str]:
+    """Return absolute template file path when available."""
+
     path = os.path.join(data_complete_path, filename)
     return path if os.path.exists(path) else None

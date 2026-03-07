@@ -1,4 +1,5 @@
 from fastapi import APIRouter, HTTPException, Depends
+import json
 from typing import List
 from bson import ObjectId
 from bson.errors import InvalidId
@@ -109,7 +110,7 @@ async def create_bot_message(
     from api.schemas.message_schemas import MessageCreate
     bot_message = MessageCreate(
         discussion_id=discussion_id,
-        content=response,
+        content=json.dumps([response, sources], ensure_ascii=False),
         role="bot",
         attachments=attachments if attachments else None
     )
