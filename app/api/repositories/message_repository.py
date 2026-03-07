@@ -173,8 +173,8 @@ class MessageRepository:
                         context_question = msg.get("content", "")
                         break
             
-            from rag.embedding import add_correction_to_chroma
-            correction_id = await add_correction_to_chroma(
+            from rag.ingest import add_correction_to_chroma
+            correction_id = add_correction_to_chroma(
                 correction_text=correction,
                 context_question=context_question,
                 admin_id=user_id,

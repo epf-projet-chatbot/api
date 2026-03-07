@@ -64,6 +64,49 @@ def get_all_corrections() -> list[dict[str, Any]]:
 
     return sorted(items, key=lambda item: item.get("created_at", ""), reverse=True)
 
+def add_correction_to_chroma(
+    correction_text: str,
+    context_question: str = "",
+    admin_id: str = "",
+    discussion_id: str = ""
+) -> str:
+    """
+    Ajoute une correction admin dans ChromaDB avec métadonnées prioritaires.
+    """
+
+    try:
+        from datetime import datetime
+
+        vector_store = get_vector_store()
+
+        timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+        safe_admin_id = admin_id or "unknown_admin"
+        correction_id = f"correction_{safe_admin_id}_{timestamp}"
+
+        correction_doc = Document(
+            page_content=correction_text.strip(),
+            metadata={
+                "type": "admin_correction",
+                "priority": "high",
+                "admin_id": admin_id,
+                "discussion_id": discussion_id,
+                "context_question": context_question,
+                "created_at": timestamp,
+                "source": "admin_correction",
+                "doc_type": "admin_correction",
+                "topic": "admin_correction",
+            }
+        )
+
+        vector_store.add_documents(
+            documents=[correction_doc],
+            ids=[correction_id],
+        )
+
+        return correction_id
+
+    except Exception as e:
+        raise Exception(f"Erreur lors de l'ajout de la correction: {e}") from e
 
 def delete_correction_from_chroma(correction_id: str) -> bool:
     """Delete an admin correction by id."""
