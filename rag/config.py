@@ -41,12 +41,12 @@ def get_llm() -> ChatOllama:
     """Create and cache the LLM client."""
 
     settings = get_settings()
-    headers = {"Authorization": f"Bearer {settings.ollama_api_key}"} if settings.ollama_api_key else {}
+    client_kwargs = {"headers": {"Authorization": f"Bearer {settings.ollama_api_key}"}} if settings.ollama_api_key else {}
     return ChatOllama(
         model=settings.ollama_llm_model,
         base_url=settings.ollama_base_url,
         temperature=0.2,
-        headers=headers,
+        client_kwargs=client_kwargs,
     )
 
 
