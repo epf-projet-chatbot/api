@@ -47,12 +47,21 @@ def get_llm() -> ChatOllama:
     )
 
 
+class MxbaiEmbeddings(OllamaEmbeddings):
+    """OllamaEmbeddings with mxbai-embed-large query prefix for asymmetric retrieval."""
+
+    def embed_query(self, text: str) -> list[float]:
+        return super().embed_query(
+            f"Represent this sentence for searching relevant passages: {text}"
+        )
+
+
 @lru_cache(maxsize=1)
-def get_embeddings() -> OllamaEmbeddings:
+def get_embeddings() -> MxbaiEmbeddings:
     """Create and cache embeddings (same model for ingestion and query time)."""
 
     settings = get_settings()
-    return OllamaEmbeddings(
+    return MxbaiEmbeddings(
         model=settings.ollama_embed_model,
         base_url=settings.ollama_base_url,
     )

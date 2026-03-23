@@ -27,7 +27,19 @@ def ingest_folder(folder_path: str) -> int:
 
     try:
         vector_store = get_vector_store()
-        vector_store.add_documents(docs)
+        batch_size = 500
+        skipped = 0
+        for i in range(0, len(docs), batch_size):
+            batch = docs[i:i + batch_size]
+            try:
+                vector_store.add_documents(batch)
+            except Exception:
+                for doc in batch:
+                    try:
+                        vector_store.add_documents([doc])
+                    except Exception:
+                        skipped += 1
+            print(f"Indexation: {min(i + batch_size, len(docs))}/{len(docs)} chunks (ignorés: {skipped})")
         print(f"Indexation OK: {len(docs)} chunks ajoutés")
         return 0
     except Exception as exc:

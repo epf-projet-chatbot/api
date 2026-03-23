@@ -122,7 +122,7 @@ def _split_large_sections(sections: Iterable[str], chunk_size: int, chunk_overla
     return chunks
 
 
-def process_documents(folder_path: str, chunk_size: int = 1000, chunk_overlap: int = 200, lemmatize: bool = False) -> list[Document]:
+def process_documents(folder_path: str, chunk_size: int = 500, chunk_overlap: int = 100, lemmatize: bool = False) -> list[Document]:
     """Load, clean, split and enrich documents for ingestion."""
 
     _ = lemmatize  # kept for backward compatibility, intentionally unused.
