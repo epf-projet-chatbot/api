@@ -1,83 +1,110 @@
-"""Document loading and legal-aware chunking utilities."""
+"""Document loading and chunking — adaptive by document type."""
 
 from __future__ import annotations
 
 import json
 import re
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
-from typing import Iterable
 
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_core.documents import Document
 
+# ---------------------------------------------------------------------------
+# Document type detection
+# ---------------------------------------------------------------------------
 
-LEGAL_SECTION_PATTERN = re.compile(
-    r"(?im)^(article\s+\d+|section\s+\d+|chapitre\s+\d+|titre\s+\d+|annexe\s+\w+|\d+\.\d+\s+.+)$"
-)
+_TYPE_RULES: list[tuple[list[str], str]] = [
+    (["avenant"], "avenant"),
+    (["convention"], "convention"),
+    (["commande", "bdc", "bon-de-commande"], "bon_de_commande"),
+    (["recette", "pv", "procès-verbal", "proces-verbal"], "proces_verbal"),
+    (["scrapping", "veille", "changements-légaux", "cadre-legal"], "veille_juridique"),
+    (["book", "comptab"], "comptabilite"),
+    (["analyse", "litige"], "analyse"),
+    (["knowledge", "base"], "base_de_connaissances"),
+]
+
+_CHUNK_SETTINGS: dict[str, tuple[int, int]] = {
+    "avenant":              (700, 150),
+    "convention":           (700, 150),
+    "bon_de_commande":      (700, 150),
+    "proces_verbal":        (600, 100),
+    "veille_juridique":     (500,  80),
+    "comptabilite":         (600, 100),
+    "analyse":              (600, 100),
+    "base_de_connaissances":(900, 150),
+    "default":              (500, 100),
+}
 
 
-def clean_text(text: str) -> str:
-    """Light cleaning while preserving legal structure."""
+def _detect_type(name: str) -> str:
+    lower = name.lower()
+    for keywords, doc_type in _TYPE_RULES:
+        if any(kw in lower for kw in keywords):
+            return doc_type
+    return "default"
 
-    text = text.replace("\u00a0", " ")
+
+def _get_splitter(doc_type: str) -> RecursiveCharacterTextSplitter:
+    size, overlap = _CHUNK_SETTINGS.get(doc_type, _CHUNK_SETTINGS["default"])
+    return RecursiveCharacterTextSplitter(
+        chunk_size=size,
+        chunk_overlap=overlap,
+        separators=["\n\n", "\n", ". ", " "],
+    )
+
+
+# ---------------------------------------------------------------------------
+# Text cleaning
+# ---------------------------------------------------------------------------
+
+def _clean(text: str) -> str:
+    text = text.replace(" ", " ").replace("\xa0", " ")
     text = re.sub(r"\r\n?", "\n", text)
     text = re.sub(r"\n{3,}", "\n\n", text)
     text = re.sub(r"[ \t]{2,}", " ", text)
+    # Remove PDF artifacts: lone page numbers, repeated dashes
+    text = re.sub(r"(?m)^\s*\d{1,3}\s*$", "", text)
+    text = re.sub(r"-{4,}", "", text)
     return text.strip()
 
 
-def _infer_doc_type(source: str) -> str:
-    src = source.lower()
-    if "avenant" in src:
-        return "avenant"
-    if "convention" in src:
-        return "convention"
-    if "commande" in src:
-        return "bon_de_commande"
-    if "recette" in src or "pv" in src:
-        return "proces_verbal"
-    return "reference"
-
-
-def _infer_topic(content: str) -> str:
-    lowered = content.lower()
-    if "rupture" in lowered:
-        return "rupture"
-    if "pro bono" in lowered or "pro-bono" in lowered:
-        return "pro_bono"
-    if "tac" in lowered:
-        return "tac"
-    if "wefa" in lowered:
-        return "wefa"
-    return "general"
-
-
-def _extract_section(text: str) -> str:
-    for line in text.splitlines()[:8]:
-        match = LEGAL_SECTION_PATTERN.match(line.strip())
-        if match:
-            return match.group(1)
-    return ""
-
-
-def _split_legal_sections(text: str) -> list[str]:
-    """Prefer splitting by legal titles/articles before size-based splitting."""
-
-    lines = text.splitlines()
-    parts: list[list[str]] = [[]]
-    for line in lines:
-        if LEGAL_SECTION_PATTERN.match(line.strip()) and parts[-1]:
-            parts.append([])
-        parts[-1].append(line)
-
-    sections = ["\n".join(part).strip() for part in parts if any(chunk.strip() for chunk in part)]
-    return sections if sections else [text]
-
+# ---------------------------------------------------------------------------
+# Loaders per file type
+# ---------------------------------------------------------------------------
 
 def _load_pdf(path: Path) -> list[Document]:
-    loader = PyPDFLoader(str(path))
-    return loader.load()
+    try:
+        return PyPDFLoader(str(path)).load()
+    except Exception:
+        return []
+
+
+def _load_json_kb(path: Path) -> list[Document]:
+    """Handle output.json knowledge base: [{filename, content}]."""
+    try:
+        items = json.loads(path.read_text(encoding="utf-8", errors="ignore"))
+    except Exception:
+        return []
+    if not isinstance(items, list):
+        return [Document(page_content=json.dumps(items, ensure_ascii=False, indent=2),
+                         metadata={"source": str(path), "doc_type": "json"})]
+    docs = []
+    for item in items:
+        content = item.get("content", "")
+        filename = item.get("filename", "")
+        if content.strip():
+            docs.append(Document(
+                page_content=content,
+                metadata={
+                    "source": filename or str(path),
+                    "doc_type": _detect_type(filename),
+                    "page": 1,
+                },
+            ))
+    return docs
 
 
 def _load_markdown(path: Path) -> list[Document]:
@@ -85,74 +112,57 @@ def _load_markdown(path: Path) -> list[Document]:
     return [Document(page_content=text, metadata={"source": str(path), "page": 1})]
 
 
-def _load_json(path: Path) -> list[Document]:
-    payload = json.loads(path.read_text(encoding="utf-8", errors="ignore"))
-    pretty = json.dumps(payload, ensure_ascii=False, indent=2)
-    return [Document(page_content=pretty, metadata={"source": str(path), "page": 1})]
+def _load_file(path: Path) -> list[Document]:
+    suffix = path.suffix.lower()
+    if suffix == ".pdf":
+        return _load_pdf(path)
+    if suffix == ".json":
+        return _load_json_kb(path)
+    if suffix in (".md", ".txt"):
+        return _load_markdown(path)
+    return []
 
 
-def load_documents(folder_path: str) -> list[Document]:
-    """Load PDF/MD/JSON documents from folder recursively."""
+# ---------------------------------------------------------------------------
+# Main entry point
+# ---------------------------------------------------------------------------
 
-    docs: list[Document] = []
-    for file_path in Path(folder_path).glob("**/*"):
-        if not file_path.is_file():
-            continue
-        try:
-            if file_path.suffix.lower() == ".pdf":
-                docs.extend(_load_pdf(file_path))
-            elif file_path.suffix.lower() == ".md":
-                docs.extend(_load_markdown(file_path))
-            elif file_path.suffix.lower() == ".json":
-                docs.extend(_load_json(file_path))
-        except Exception:
-            continue
-    return docs
-
-
-def _split_large_sections(sections: Iterable[str], chunk_size: int, chunk_overlap: int) -> list[str]:
-    splitter = RecursiveCharacterTextSplitter(
-        chunk_size=chunk_size,
-        chunk_overlap=chunk_overlap,
-        separators=["\n\n", "\n", ". ", " "],
-    )
-    chunks: list[str] = []
-    for section in sections:
-        chunks.extend(splitter.split_text(section))
-    return chunks
-
-
-def process_documents(folder_path: str, chunk_size: int = 500, chunk_overlap: int = 100, lemmatize: bool = False) -> list[Document]:
-    """Load, clean, split and enrich documents for ingestion."""
-
-    _ = lemmatize  # kept for backward compatibility, intentionally unused.
-
-    loaded = load_documents(folder_path)
-    if not loaded:
+def _process_file(path: Path) -> list[Document]:
+    """Load, clean, and chunk a single file."""
+    raw_docs = _load_file(path)
+    if not raw_docs:
         return []
 
+    doc_type = _detect_type(path.name)
     output: list[Document] = []
-    for doc in loaded:
-        source = str(doc.metadata.get("source", "source inconnue"))
-        page = doc.metadata.get("page", "?")
-        base_text = clean_text(doc.page_content)
-        sections = _split_legal_sections(base_text)
-        chunks = _split_large_sections(sections, chunk_size=chunk_size, chunk_overlap=chunk_overlap)
 
-        for chunk in chunks:
-            if not chunk.strip():
+    for doc in raw_docs:
+        effective_type = doc.metadata.get("doc_type", doc_type)
+        splitter = _get_splitter(effective_type)
+        text = _clean(doc.page_content)
+        for chunk in splitter.split_text(text):
+            if len(chunk.strip()) < 30:
                 continue
-            output.append(
-                Document(
-                    page_content=chunk,
-                    metadata={
-                        "source": source,
-                        "page": page,
-                        "section": _extract_section(chunk),
-                        "doc_type": _infer_doc_type(source),
-                        "topic": _infer_topic(chunk),
-                    },
-                )
-            )
+            output.append(Document(
+                page_content=chunk,
+                metadata={
+                    "source": doc.metadata.get("source", str(path)),
+                    "page": doc.metadata.get("page", 1),
+                    "doc_type": effective_type,
+                },
+            ))
+    return output
+
+
+def process_documents(folder_path: str) -> list[Document]:
+    """Load, clean, and chunk all documents in parallel with type-adaptive settings."""
+
+    paths = [p for p in sorted(Path(folder_path).glob("**/*")) if p.is_file()]
+    output: list[Document] = []
+
+    with ThreadPoolExecutor(max_workers=4) as executor:
+        futures = {executor.submit(_process_file, p): p for p in paths}
+        for future in as_completed(futures):
+            output.extend(future.result())
 
     return output
