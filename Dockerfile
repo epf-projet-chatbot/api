@@ -35,6 +35,7 @@ RUN pip install --no-cache-dir --upgrade pip && \
 # ================================
 # Copy application code (structure correcte)
 COPY app/ ./
+COPY download_model.py .
 COPY rag/ ./rag/
 
 # ================================
